@@ -114,7 +114,7 @@
 
     try {
       const response = await fetch(
-        `/api/history?endpoint=${encodeURIComponent(endpoint)}&timeRange=${range}`
+              `/api/history?endpoint=${encodeURIComponent(endpoint)}&timeRange=${range}`
       );
       const data = await response.json();
 
@@ -141,6 +141,32 @@
   function handleEndpointSelect(endpoint) {
     selectedEndpoint = endpoint.url;
   }
+
+  // Calculate maximum block height
+  $: maxBlockHeight = Math.max(
+          ...results
+                  .filter(result => result.status === 'success' && result.blockHeight !== undefined)
+                  .map(result => result.blockHeight),
+          0
+  );
+
+  // Function to determine row class based on status and block height
+  function getRowClass(result) {
+    if (result.status !== 'success') {
+      return 'error';
+    }
+
+    if (result.blockHeight === undefined) {
+      return 'success';
+    }
+
+    // More than 2 blocks behind the maximum height
+    if (maxBlockHeight - result.blockHeight > 2) {
+      return 'warning';
+    }
+
+    return 'success';
+  }
 </script>
 
 <svelte:head>
@@ -154,8 +180,8 @@
       {#if browser}
         <label>
           <input
-            type="checkbox"
-            bind:checked={useBackend}
+                  type="checkbox"
+                  bind:checked={useBackend}
           />
           Use Backend Data Source
         </label>
@@ -175,27 +201,27 @@
     <h2>RPC Endpoints Status</h2>
     <table>
       <thead>
-        <tr>
-          <th>Name</th>
-          <th>URL</th>
-          <th>Block Height</th>
-          <th>Response Time</th>
-          <th>Status</th>
-        </tr>
+      <tr>
+        <th>Name</th>
+        <th>URL</th>
+        <th>Block Height</th>
+        <th>Response Time</th>
+        <th>Status</th>
+      </tr>
       </thead>
       <tbody>
-        {#each results as result, index (index)}
-          <tr
-            class={result.status === 'success' ? 'success' : 'error'}
-            on:click={() => handleEndpointSelect(result.endpoint)}
-          >
-            <td>{result.endpoint.name}</td>
-            <td>{result.endpoint.url}</td>
-            <td>{result.blockHeight || 'N/A'}</td>
-            <td>{result.responseTime.toFixed(2)} ms</td>
-            <td>{result.status}</td>
-          </tr>
-        {/each}
+      {#each results as result, index (index)}
+        <tr
+                class={getRowClass(result)}
+                on:click={() => handleEndpointSelect(result.endpoint)}
+        >
+          <td>{result.endpoint.name}</td>
+          <td>{result.endpoint.url}</td>
+          <td>{result.blockHeight || 'N/A'}</td>
+          <td>{result.responseTime.toFixed(2)} ms</td>
+          <td>{result.status}</td>
+        </tr>
+      {/each}
       </tbody>
     </table>
   </section>
@@ -258,6 +284,10 @@
 
   tr.error td {
     background-color: rgba(255, 0, 0, 0.1);
+  }
+
+  tr.warning td {
+    background-color: rgba(255, 191, 0, 0.2);
   }
 
   .chart-container {
