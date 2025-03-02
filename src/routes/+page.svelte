@@ -476,10 +476,10 @@
         endpointHistory[url] = Array(7).fill("unknown");
       }
 
-      // Shift existing statuses to the right (newest always at index 0)
+      // Shift existing statuses to the left (newest always at the end/right)
       const newHistory = [...endpointHistory[url]];
-      newHistory.pop(); // Remove the oldest (rightmost) status
-      newHistory.unshift(status); // Add new status at the beginning (left)
+      newHistory.shift(); // Remove the oldest (leftmost) status
+      newHistory.push(status); // Add new status at the end (right)
       endpointHistory[url] = newHistory;
 
       // Update local history data for charts
