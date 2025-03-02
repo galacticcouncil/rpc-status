@@ -126,25 +126,26 @@
     fetchHistoricalData(selectedEndpoint, timeRange);
   }
 
-  // Toggle settings menu
-  function toggleSettings() {
-    showSettings = !showSettings;
-  }
-
   // Select a time range and close menu
   function selectTimeRange(range) {
     timeRange = range;
-    showSettings = false;
 
     if (showChart && selectedEndpoint) {
       fetchHistoricalData(selectedEndpoint, timeRange);
     }
   }
 
+  function toggleRange() {
+    if (timeRange === '15m') return selectTimeRange('1h');
+    if (timeRange === '1h') return selectTimeRange('3h');
+    if (timeRange === '3h') return selectTimeRange('12h');
+    if (timeRange === '12h') return selectTimeRange('24h');
+    if (timeRange === '24h') return selectTimeRange('15m');
+  }
+
   // Toggle backend use and close menu
   function toggleBackend() {
     useBackend = !useBackend;
-    showSettings = false;
   }
 
   // Fetch results from backend
@@ -423,7 +424,7 @@
                 <ul>
                     <li>
                         <span on:click={toggleBackend}>
-                          {useBackend ? '[x] Remote' : '[ ] Remote'}
+                          {useBackend ? 'Use Local' : 'Use Remote'}
                         </span>
                     </li>
                     <div class="tui-black-divider"></div>
@@ -516,11 +517,11 @@
 
     <div class="tui-statusbar">
         <ul>
-            <li>
+            <li on:click={toggleBackend}>
                 <span>{useBackend ? 'Remote' : 'Local'}</span>
             </li>
             <span class="tui-statusbar-divider"></span>
-            <li>
+            <li on:click={toggleRange}>
                 <span>Time range: {timeRange}</span>
             </li>
         </ul>
