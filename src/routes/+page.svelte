@@ -570,6 +570,29 @@
                         </div>
                     {/if}
                 </div>
+                <!-- Stats row with uptime and avg response time -->
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <span class="stat-label">Uptime:</span>
+                        <span class="stat-value">
+                            {#if historyData.length > 0}
+                                {(100 - (historyData.filter(d => d.error).length / historyData.length * 100)).toFixed(0)}% ({historyData.filter(d => d.error).length}:{historyData.length})
+                            {:else}
+                                N/A
+                            {/if}
+                        </span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Avg Response:</span>
+                        <span class="stat-value">
+                            {#if historyData.filter(d => !d.error).length > 0}
+                                {(historyData.filter(d => !d.error).reduce((sum, d) => sum + d.value, 0) / historyData.filter(d => !d.error).length).toFixed(2)} ms
+                            {:else}
+                                N/A
+                            {/if}
+                        </span>
+                    </div>
+                </div>
                 <div>
                     <span>Endpoint: {selectedEndpoint}</span>
                 </div>
