@@ -12,6 +12,9 @@
   }
 
   const CHECK_INTERVAL = 10000; // 10 seconds
+  const LOCAL_STORAGE_KEY = 'hydration-rpc-monitor-data';
+  const LOCAL_STORAGE_ENDPOINT_HISTORY_KEY = 'hydration-rpc-endpoint-history';
+  const MAX_STORAGE_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
   // State variables
   let results = [];
@@ -30,10 +33,104 @@
   let showChart = false;
   let showSettings = false;
   let currentTime = new Date(); // For time display
+  let lastSaveTime = 0; // To limit save frequency
+
+  // Load data from localStorage
+  function loadLocalData() {
+    if (!browser) return;
+
+    try {
+      // Load historical data
+      const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+
+        // Convert string dates back to Date objects
+        Object.keys(parsedData).forEach(endpoint => {
+          if (Array.isArray(parsedData[endpoint])) {
+            parsedData[endpoint] = parsedData[endpoint].map(item => ({
+              ...item,
+              time: new Date(item.time)
+            }));
+
+            // Filter out data older than MAX_STORAGE_AGE_MS
+            const cutoffTime = new Date().getTime() - MAX_STORAGE_AGE_MS;
+            parsedData[endpoint] = parsedData[endpoint].filter(item =>
+              item.time.getTime() >= cutoffTime
+            );
+          }
+        });
+
+        localHistoryData = parsedData;
+        console.log('Loaded historical data from localStorage');
+      }
+
+      // Load endpoint history
+      const savedHistory = localStorage.getItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY);
+      if (savedHistory) {
+        endpointHistory = JSON.parse(savedHistory);
+        console.log('Loaded endpoint history from localStorage');
+      }
+    } catch (error) {
+      console.error('Error loading data from localStorage:', error);
+      // If data is corrupted, reset it
+      localHistoryData = {};
+      endpointHistory = {};
+    }
+  }
+
+  // Save data to localStorage
+  function saveLocalData() {
+    if (!browser) return;
+
+    // Limit save frequency to prevent performance issues (save at most once every 30 seconds)
+    const now = Date.now();
+    if (now - lastSaveTime < 30000) return;
+    lastSaveTime = now;
+
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localHistoryData));
+      localStorage.setItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY, JSON.stringify(endpointHistory));
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+
+      if (error.name === 'QuotaExceededError' || error.toString().includes('quota')) {
+        // Handle storage limit exceeded by pruning old data
+        pruneOldData();
+        // Try again
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localHistoryData));
+          localStorage.setItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY, JSON.stringify(endpointHistory));
+        } catch (retryError) {
+          console.error('Still unable to save after pruning:', retryError);
+        }
+      }
+    }
+  }
+
+  // Prune old data if we exceed storage limits
+  function pruneOldData() {
+    // Cut our retention window in half
+    const reducedAgeMs = MAX_STORAGE_AGE_MS / 2;
+    const cutoffTime = new Date().getTime() - reducedAgeMs;
+
+    Object.keys(localHistoryData).forEach(endpoint => {
+      if (Array.isArray(localHistoryData[endpoint])) {
+        localHistoryData[endpoint] = localHistoryData[endpoint].filter(item =>
+          item.time.getTime() >= cutoffTime
+        );
+      }
+    });
+
+    console.log('Pruned old data to reduce storage size');
+  }
 
   // Initialize browser monitor
   function initMonitor() {
     if (!browser || !PolkadotRpcMonitor) return;
+
+    // Load saved data first
+    loadLocalData();
 
     monitor = new PolkadotRpcMonitor();
 
@@ -97,6 +194,9 @@
       if (timeIntervalId) {
         clearInterval(timeIntervalId);
       }
+
+      // Save data before unloading
+      saveLocalData();
     }
   });
 
@@ -404,10 +504,20 @@
     // Force Svelte to detect the change
     endpointHistory = {...endpointHistory};
 
+    // Save to localStorage (throttled internally)
+    saveLocalData();
+
     // Refresh chart data if we're currently viewing a chart
     if (showChart && selectedEndpoint) {
       fetchHistoricalData(selectedEndpoint, timeRange);
     }
+  }
+
+  // Add a window event listener to save data before the page unloads
+  if (browser) {
+    window.addEventListener('beforeunload', () => {
+      saveLocalData();
+    });
   }
 </script>
 
@@ -523,6 +633,10 @@
             <span class="tui-statusbar-divider"></span>
             <li on:click={toggleRange}>
                 <span>Time range: {timeRange}</span>
+            </li>
+            <span class="tui-statusbar-divider"></span>
+            <li>
+                <span>Local Data: {Object.keys(localHistoryData).length > 0 ? 'Available' : 'None'}</span>
             </li>
         </ul>
     </div>
