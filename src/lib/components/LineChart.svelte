@@ -5,6 +5,7 @@
 
   // Props
   export let data = [];
+  export let errorThreshold = 2000; // Consider anything above 2000ms as potential error
 
   // DOM elements
   let chart;
@@ -54,25 +55,57 @@
       .domain(d3.extent(data, d => typeof d.time === 'string' ? new Date(d.time) : d.time))
       .range([0, width]);
 
+    // Find reasonable max for y scale, excluding extreme outliers
+    const validValues = data
+      .filter(d => d.value !== null && d.value !== undefined && !d.error)
+      .map(d => d.value);
+
+    // Use 90th percentile + padding as max for normal view
+    const normalMax = d3.quantile(validValues.sort(d3.ascending), 0.9) * 1.5 || errorThreshold;
+
     const y = d3.scaleLinear()
-      .domain([0, d3.max(data, d => d.value) * 1.1]) // Add 10% padding
+      .domain([0, normalMax])
       .range([height, 0]);
 
-    // Calculate average latency
-    const averageLatency = d3.mean(data, d => d.value);
+    // Calculate average latency (excluding errors)
+    const averageLatency = d3.mean(validValues);
 
-    // Create smoother line generator with tension control
+    // Separate data into segments where there are no errors
+    const segments = [];
+    let currentSegment = [];
+
+    data.forEach(d => {
+      const isError = d.error || d.value === null || d.value > errorThreshold;
+
+      if (!isError) {
+        currentSegment.push(d);
+      } else {
+        if (currentSegment.length > 0) {
+          segments.push([...currentSegment]);
+          currentSegment = [];
+        }
+        // Add the error point as its own "segment" for highlighting
+        segments.push([{...d, isError: true}]);
+      }
+    });
+
+    // Add the last segment if it exists
+    if (currentSegment.length > 0) {
+      segments.push(currentSegment);
+    }
+
+    // Create line generator for normal data
     const line = d3.line()
       .x(d => x(typeof d.time === 'string' ? new Date(d.time) : d.time))
-      .y(d => y(d.value))
+      .y(d => y(Math.min(d.value, normalMax))) // Cap at normalMax for display
       .curve(d3.curveBasis); // Smoother curve
 
     // Add X axis
     g.append('g')
       .attr('transform', `translate(0,${height})`)
       .call(d3.axisBottom(x)
-        .ticks(5) // Fewer ticks for simplicity
-        .tickFormat(d3.timeFormat('%H:%M'))) // Simpler time format
+        .ticks(5)
+        .tickFormat(d3.timeFormat('%H:%M')))
       .selectAll('text')
       .style('text-anchor', 'end')
       .attr('dx', '-.8em')
@@ -83,13 +116,49 @@
     g.append('g')
       .call(d3.axisLeft(y).ticks(5));
 
-    // Add the line
-    g.append('path')
-      .datum(data)
-      .attr('fill', 'none')
-      .attr('stroke', 'steelblue')
-      .attr('stroke-width', 2)
-      .attr('d', line);
+    // Draw each segment
+    segments.forEach(segment => {
+      if (segment.length === 0) return;
+
+      // Check if this is an error segment
+      if (segment.length === 1 && segment[0].isError) {
+        // Draw error marker
+        const d = segment[0];
+        g.append('rect')
+          .attr('x', x(typeof d.time === 'string' ? new Date(d.time) : d.time) - 5)
+          .attr('y', 0)
+          .attr('width', 10)
+          .attr('height', height)
+          .attr('fill', 'rgba(255, 0, 0, 0.2)')
+          .attr('stroke', 'none');
+
+        g.append('text')
+          .attr('x', x(typeof d.time === 'string' ? new Date(d.time) : d.time))
+          .attr('y', 20)
+          .attr('text-anchor', 'middle')
+          .attr('fill', 'red')
+          .attr('font-size', '12px')
+          .text('⚠️ Error');
+      } else {
+        // Draw normal line segment
+        g.append('path')
+          .datum(segment)
+          .attr('fill', 'none')
+          .attr('stroke', 'steelblue')
+          .attr('stroke-width', 2)
+          .attr('d', line);
+      }
+    });
+
+    // Add circles for valid data points (for clarity)
+    g.selectAll('.data-point')
+      .data(data.filter(d => !d.error && d.value !== null && d.value <= errorThreshold))
+      .enter()
+      .append('circle')
+      .attr('cx', d => x(typeof d.time === 'string' ? new Date(d.time) : d.time))
+      .attr('cy', d => y(d.value))
+      .attr('r', 3)
+      .attr('fill', 'steelblue');
 
     // Add average line
     g.append('line')

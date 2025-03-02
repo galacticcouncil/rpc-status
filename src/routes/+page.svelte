@@ -117,14 +117,21 @@
     if (!browser) return;
 
     try {
-      // Use response time metric instead of block height
-      const response = await fetch(
+      // Get latency data
+      const latencyResponse = await fetch(
               `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_response_time_ms&timeRange=${range}`
       );
-      const data = await response.json();
+      const latencyData = await latencyResponse.json();
 
-      if (data.data && data.data.result) {
-        historyData = processHistoricalData(data.data.result);
+      // Get status data to identify errors
+      const statusResponse = await fetch(
+              `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_status&timeRange=${range}`
+      );
+      const statusData = await statusResponse.json();
+
+      if (latencyData.data?.result && statusData.data?.result) {
+        // Process and merge both datasets
+        historyData = processHistoricalData(latencyData.data.result, statusData.data.result);
       }
     } catch (error) {
       console.error('Error fetching historical data:', error);
@@ -132,14 +139,28 @@
   }
 
   // Process Prometheus data format to chart format
-  function processHistoricalData(result) {
-    if (!result || !result.length) return [];
+  function processHistoricalData(latencyResult, statusResult) {
+    if (!latencyResult || !latencyResult.length) return [];
 
-    // Convert Prometheus data format to chart format
-    return result[0].values.map(([timestamp, value]) => ({
-      time: new Date(timestamp * 1000),
-      value: parseFloat(value)
-    }));
+    const latencyData = latencyResult[0]?.values || [];
+    const statusData = statusResult[0]?.values || [];
+
+    // Create a map of timestamps to status values
+    const statusMap = new Map();
+    statusData.forEach(([timestamp, value]) => {
+      statusMap.set(timestamp, parseFloat(value));
+    });
+
+    // Convert Prometheus data format to chart format with error flags
+    return latencyData.map(([timestamp, value]) => {
+      const status = statusMap.get(timestamp);
+      return {
+        time: new Date(timestamp * 1000),
+        value: parseFloat(value),
+        // Mark as error if status is 0 (down) or undefined
+        error: status === 0 || status === undefined
+      };
+    });
   }
 
   // Process data for chart display - smooth and simplify
