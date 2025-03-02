@@ -1,7 +1,7 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import {onMount, onDestroy} from 'svelte';
   import LineChart from '$lib/components/LineChart.svelte';
-  import { browser } from '$app/environment';
+  import {browser} from '$app/environment';
 
   // RPC monitor imports (loaded only on client-side)
   let PolkadotRpcMonitor;
@@ -172,13 +172,13 @@
       try {
         // Get latency data from backend/Prometheus
         const latencyResponse = await fetch(
-                `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_response_time_ms&timeRange=${range}`
+          `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_response_time_ms&timeRange=${range}`
         );
         const latencyData = await latencyResponse.json();
 
         // Get status data to identify errors
         const statusResponse = await fetch(
-                `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_status&timeRange=${range}`
+          `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_status&timeRange=${range}`
         );
         const statusData = await statusResponse.json();
 
@@ -196,7 +196,7 @@
         const now = new Date();
         const rangeInMs = parseTimeRange(range);
         const filteredData = localHistoryData[endpoint].filter(d =>
-                (now - d.time) <= rangeInMs
+          (now - d.time) <= rangeInMs
         );
 
         historyData = filteredData;
@@ -287,13 +287,13 @@
 
   // Calculate maximum block height
   $: maxBlockHeight = results.length > 0
-          ? Math.max(
-                  ...results
-                          .filter(result => result.status === 'success' && result.blockHeight !== undefined)
-                          .map(result => result.blockHeight),
-                  0
-          )
-          : 0;
+    ? Math.max(
+      ...results
+        .filter(result => result.status === 'success' && result.blockHeight !== undefined)
+        .map(result => result.blockHeight),
+      0
+    )
+    : 0;
 
   // Helper function to categorize status
   function categorizeStatus(result) {
@@ -376,205 +376,232 @@
 </script>
 
 <svelte:head>
-  <title>Hydration RPC Monitor</title>
+    <title>Hydration RPC Monitor</title>
 </svelte:head>
 
+<nav class="tui-nav">
+    <ul>
+        <li class="tui-dropdown">
+            <span>Data Source</span>
+            <div class="tui-dropdown-content">
+                <ul>
+                    <li>
+                        <span on:click={toggleBackend}>
+                          {useBackend ? '[x] Backend' : '[ ] Backend'}
+                        </span>
+                    </li>
+                    <div class="tui-black-divider"></div>
+                    <li>
+                        <span class="tui-menu-item" class:tui-menu-active={timeRange === '15m'}
+                              on:click={() => selectTimeRange('15m')}>
+                          Last 15 min
+                        </span>
+                    </li>
+                    <li>
+                        <span class="tui-menu-item" class:tui-menu-active={timeRange === '1h'}
+                              on:click={() => selectTimeRange('1h')}>
+                          Last hour
+                        </span>
+                    </li>
+                    <li>
+                        <span class="tui-menu-item" class:tui-menu-active={timeRange === '3h'}
+                              on:click={() => selectTimeRange('3h')}>
+                          Last 3 hours
+                        </span>
+                    </li>
+                    <li>
+                        <span class="tui-menu-item" class:tui-menu-active={timeRange === '12h'}
+                              on:click={() => selectTimeRange('12h')}>
+                          Last 12 hours
+                        </span>
+                    </li>
+                    <li>
+                        <span class="tui-menu-item" class:tui-menu-active={timeRange === '24h'}
+                              on:click={() => selectTimeRange('24h')}>
+                          Last 24 hours
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </li>
+
+        <span class="tui-datetime" data-format="h:m:s a">{new Date().toLocaleTimeString()}</span>
+    </ul>
+
+</nav>
+
 <main class="tui-bg-blue-black">
-  <div class="tui-window">
-    <!-- Menu bar with improved contrast -->
-    <div class="tui-menubar">
-      <div class="tui-menu">
-        <span class="tui-menu-btn" on:click={toggleSettings}>Settings</span>
-        {#if showSettings}
-          <div class="tui-menu-content">
-            <span class="tui-menu-item" on:click={toggleBackend}>
-              {useBackend ? '✓ Use Backend Data' : '◯ Use Backend Data'}
-            </span>
-
-            <div class="tui-menu-divider"></div>
-
-            <span class="tui-menu-item" class:tui-menu-active={timeRange === '15m'} on:click={() => selectTimeRange('15m')}>
-              Last 15 minutes
-            </span>
-            <span class="tui-menu-item" class:tui-menu-active={timeRange === '1h'} on:click={() => selectTimeRange('1h')}>
-              Last hour
-            </span>
-            <span class="tui-menu-item" class:tui-menu-active={timeRange === '3h'} on:click={() => selectTimeRange('3h')}>
-              Last 3 hours
-            </span>
-            <span class="tui-menu-item" class:tui-menu-active={timeRange === '12h'} on:click={() => selectTimeRange('12h')}>
-              Last 12 hours
-            </span>
-            <span class="tui-menu-item" class:tui-menu-active={timeRange === '24h'} on:click={() => selectTimeRange('24h')}>
-              Last 24 hours
-            </span>
-          </div>
-        {/if}
-      </div>
-    </div>
-
-    <!-- Window header with high-contrast colors -->
-    <div class="tui-window-header tui-bg-blue tui-fg-white">
-      <span>Hydration RPC Monitor - System Status</span>
-    </div>
 
     <!-- Content -->
     <div class="tui-window-content" style="padding: 5px;">
-      <!-- RPC status table -->
-      <div class="tui-panel rpc-panel" style="width: 100%;">
-        <div class="tui-panel-header tui-bg-blue tui-fg-white">RPC Endpoints Status</div>
-        <div class="tui-panel-content" style="padding: 0;">
-          <div class="tui-table-container">
-            <table class="tui-table">
-              <thead>
-              <tr>
-                <th>Name</th>
-                <th>URL</th>
-                <th>Block Height</th>
-                <th>Response Time</th>
-                <th>Status</th>
-              </tr>
-              </thead>
-              <tbody>
-              {#each results as result, index (index)}
-                <tr
-                        class={getRowClass(result)}
-                        on:click={() => handleEndpointSelect(result.endpoint)}
-                        style="cursor: pointer;"
-                >
-                  <td>{result.endpoint.name}</td>
-                  <td>{result.endpoint.url}</td>
-                  <td>{result.blockHeight || 'N/A'}</td>
-                  <td>{result.responseTime.toFixed(2)} ms</td>
-                  <td>
-                    <div style="display: flex; align-items: center;">
-                      {#if endpointHistory[result.endpoint.url]}
-                        {#each endpointHistory[result.endpoint.url] as status}
-                          <span class={`status-icon ${status}`} title={status}></span>
+        <!-- RPC status table -->
+        <div class="tui-panel rpc-panel" style="width: 100%;">
+            <div class="tui-panel-header tui-bg-blue tui-fg-white">Hydration RPC Endpoints Status</div>
+            <div class="tui-panel-content" style="padding: 0;">
+                <div class="tui-table-container">
+                    <table class="tui-table hovered-cyan striped-purple">
+                        <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>URL</th>
+                            <th>Block</th>
+                            <th>Latency</th>
+                            <th>Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {#each results as result, index (index)}
+                            <tr
+                                    on:click={() => handleEndpointSelect(result.endpoint)}
+                                    style="cursor: pointer;"
+                            >
+                                <td>{result.endpoint.name}</td>
+                                <td>{result.endpoint.url}</td>
+                                <td>{result.blockHeight || 'N/A'}</td>
+                                <td>{result.responseTime.toFixed(2)} ms</td>
+                                <td>
+                                    <div style="display: flex; align-items: center;">
+                                        {#if endpointHistory[result.endpoint.url]}
+                                            {#each endpointHistory[result.endpoint.url] as status}
+                                                <span class={`status-icon ${status}`} title={status}></span>
+                                            {/each}
+                                        {:else}
+                                            {#each Array(7).fill('unknown') as _}
+                                                <span class="status-icon unknown" title="No data yet"></span>
+                                            {/each}
+                                        {/if}
+                                    </div>
+                                </td>
+                            </tr>
                         {/each}
-                      {:else}
-                        {#each Array(7).fill('unknown') as _}
-                          <span class="status-icon unknown" title="No data yet"></span>
-                        {/each}
-                      {/if}
-                    </div>
-                  </td>
-                </tr>
-              {/each}
-              </tbody>
-            </table>
-          </div>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
 
     <div class="tui-statusbar">
-      <span>F1:Help</span>
-      <span>F5:Refresh</span>
-      <span>Time range: {timeRange}</span>
-      <span>Data source: {useBackend ? 'Backend' : 'Local'}</span>
-      <span class="tui-statusbar-right">{new Date().toLocaleTimeString()}</span>
+        <ul>
+            <li>
+                <span>Data source: {useBackend ? 'Backend' : 'Local'}</span>
+            </li>
+            <span class="tui-statusbar-divider"></span>
+            <li>
+                <span>Time range: {timeRange}</span>
+            </li>
+        </ul>
     </div>
-  </div>
 
-  <!-- Overlap for modal -->
-  <div class="tui-overlap"></div>
+    <!-- Overlap for modal -->
+    <div class="tui-overlap"></div>
 
-  <!-- Chart Modal window -->
-  <div id="chart-modal" class="tui-modal">
-    <div class="tui-window modal-centered" style="width: 80%; max-width: 900px; height: auto; max-height: 80%;">
-      <fieldset class="tui-fieldset">
-        <legend class="tui-bg-blue tui-fg-white">Historical Latency Data: {selectedEndpointName}</legend>
+    <!-- Chart Modal window -->
+    <div id="chart-modal" class="tui-modal">
+        <div class="tui-window modal-centered" style="width: 80%; max-width: 900px; height: auto; max-height: 80%;">
+            <fieldset class="tui-fieldset">
+                <legend class="tui-bg-blue tui-fg-white">Historical Latency Data: {selectedEndpointName}</legend>
 
-        <div class="chart-container" style="height: 400px; margin-bottom: 15px;">
-          {#if historyData.length > 0}
-            <LineChart data={processChartData(historyData)} />
-          {:else}
-            <div class="tui-panel" style="height: 100%;">
-              <div class="tui-panel-content" style="display: flex; justify-content: center; align-items: center; height: 100%;">
-                <p>Loading chart data...</p>
-              </div>
-            </div>
-          {/if}
+                <div class="chart-container" style="height: 400px; margin-bottom: 15px;">
+                    {#if historyData.length > 0}
+                        <LineChart data={processChartData(historyData)}/>
+                    {:else}
+                        <div class="tui-panel" style="height: 100%;">
+                            <div class="tui-panel-content"
+                                 style="display: flex; justify-content: center; align-items: center; height: 100%;">
+                                <p>Loading chart data...</p>
+                            </div>
+                        </div>
+                    {/if}
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span>Endpoint: {selectedEndpoint}</span>
+                    </div>
+                    <div>
+                        <button class="tui-button tui-modal-close-button" on:click={closeChartModal}
+                                data-modal="chart-modal">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </fieldset>
         </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <span>Endpoint: {selectedEndpoint}</span>
-          </div>
-          <div>
-            <button class="tui-button tui-modal-close-button" on:click={closeChartModal} data-modal="chart-modal">
-              Close
-            </button>
-          </div>
-        </div>
-      </fieldset>
     </div>
-  </div>
 </main>
 
 <style>
-  main {
-    height: 100vh;
-    padding: 20px;
-    overflow: auto;
-  }
+    main {
+        height: 100vh;
+        padding: 20px;
+        overflow: auto;
+    }
 
-  /* Custom styles for TUI CSS */
-  .success { color: var(--success-color); }
-  .warning { color: var(--warning-color); }
-  .error { color: var(--error-color); }
-  .timeout { color: var(--timeout-color); }
+    /* Custom styles for TUI CSS */
+    .success {
+    }
 
-  .tui-window {
-    width: calc(100% - 10px);
-    height: calc(100% - 30px);
-  }
+    .warning {
+        color: var(--warning-color);
+    }
 
-  /* Make table more readable */
-  .tui-table {
-    width: 100%;
-  }
+    .error {
+        color: var(--error-color);
+    }
 
-  .tui-table tr:hover {
-    background-color: var(--tui-bg-highlighted);
-  }
+    .timeout {
+        color: var(--timeout-color);
+    }
 
-  /* Status indicators */
-  .status-icon {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    margin-right: 3px;
-    border-radius: 50%;
-  }
+    .tui-window {
+        width: calc(100% - 10px);
+        height: calc(100% - 30px);
+    }
 
-  /* Modal initial state */
-  .tui-modal, .tui-overlap {
-    display: none;
-  }
+    /* Make table more readable */
+    .tui-table {
+        width: 100%;
+    }
 
-  /* Modal centering */
-  .modal-centered {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
+    .tui-table tr:hover {
+        background-color: var(--tui-bg-highlighted);
+    }
 
-  /* Chart container */
-  .chart-container {
-    width: 100%;
-    min-height: 400px;
-  }
+    /* Status indicators */
+    .status-icon {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-right: 3px;
+    }
 
-  /* Custom TUI Menu styles */
-  .tui-menu-btn {
-    cursor: pointer;
-    padding: 0 10px;
-  }
+    /* Modal initial state */
+    .tui-modal, .tui-overlap {
+        display: none;
+    }
 
-  .tui-menu-active {
-    background-color: var(--tui-bg-highlighted);
-  }
+    /* Modal centering */
+    .modal-centered {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+
+    /* Chart container */
+    .chart-container {
+        width: 100%;
+        min-height: 400px;
+    }
+
+    /* Custom TUI Menu styles */
+    .tui-menu-btn {
+        cursor: pointer;
+        padding: 0 10px;
+    }
+
+    .tui-menu-active {
+        background-color: var(--tui-bg-highlighted);
+    }
 </style>

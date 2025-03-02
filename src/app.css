@@ -38,7 +38,7 @@ body {
     margin-right: 2px;
 }
 
-.success { color: var(--success-color); }
+.success { }
 .warning { color: var(--warning-color); }
 .error { color: var(--error-color); }
 .timeout { color: var(--timeout-color); }
@@ -47,7 +47,7 @@ body {
 .status-icon.warning { background-color: var(--warning-color); }
 .status-icon.error { background-color: var(--error-color); }
 .status-icon.timeout { background-color: var(--timeout-color); }
-.status-icon.unknown { background-color: var(--tui-text); }
+.status-icon.unknown { background-color: grey; }
 
 /* Fix menu item hover */
 .tui-menu-item:hover {
