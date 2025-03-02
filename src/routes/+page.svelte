@@ -20,6 +20,7 @@
   let selectedEndpointName = null;
   let timeRange = '1h';
   let useBackend = false;
+  let oldUseBackend = useBackend; // Track previous value to prevent unnecessary updates
   let monitor;
   let intervalId;
   let timeIntervalId; // For time updates
@@ -99,8 +100,9 @@
     }
   });
 
-  // Toggle between backend and browser monitoring
-  $: if (browser && monitor) {
+  // Toggle between backend and browser monitoring - only when useBackend actually changes
+  $: if (browser && monitor && (oldUseBackend !== useBackend)) {
+    oldUseBackend = useBackend;
     if (useBackend) {
       monitor.stop();
       fetchResultsFromBackend();
@@ -119,8 +121,8 @@
     }
   }
 
-  // Fetch historical data when endpoint or time range changes
-  $: if (browser && selectedEndpoint && showChart) {
+  // Fetch historical data when time range changes (not endpoint selection)
+  $: if (browser && selectedEndpoint && showChart && timeRange) {
     fetchHistoricalData(selectedEndpoint, timeRange);
   }
 
@@ -285,18 +287,26 @@
     return Math.max(...data.map(d => d.value), 1000);
   }
 
-  // Handle endpoint selection for chart modal
+  // Handle endpoint selection for chart modal - Fixed to avoid triggering pings
   function handleEndpointSelect(endpoint) {
     selectedEndpoint = endpoint.url;
     selectedEndpointName = endpoint.name;
     showChart = true;
 
     if (browser) {
-      // Open the modal
+      // Just open the modal, use cached data only
       document.getElementById('chart-modal').style.display = 'block';
 
-      // Fetch data
-      fetchHistoricalData(endpoint.url, timeRange);
+      // Use the existing local history data without triggering a reactive update
+      if (localHistoryData[endpoint.url]) {
+        const now = new Date();
+        const rangeInMs = parseTimeRange(timeRange);
+        historyData = localHistoryData[endpoint.url].filter(d =>
+          (now - d.time) <= rangeInMs
+        );
+      } else {
+        historyData = [];
+      }
     }
   }
 
