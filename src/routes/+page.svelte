@@ -519,6 +519,26 @@
       saveLocalData();
     });
   }
+
+  // Function to clear local data
+  function clearLocalData() {
+    if (!browser) return;
+
+    // Clear data from localStorage
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY);
+
+    // Clear memory variables
+    localHistoryData = {};
+    endpointHistory = {};
+
+    // Update UI to reflect cleared data
+    if (showChart && selectedEndpoint) {
+      historyData = [];
+    }
+
+    console.log('Local data cleared');
+  }
 </script>
 
 <svelte:head>
@@ -566,6 +586,12 @@
                         <span class="tui-menu-item" class:tui-menu-active={timeRange === '24h'}
                               on:click={() => selectTimeRange('24h')}>
                           Last 24 hours
+                        </span>
+                    </li>
+                    <div class="tui-black-divider"></div>
+                    <li>
+                        <span on:click={clearLocalData}>
+                          Clear Local
                         </span>
                     </li>
                 </ul>
@@ -633,10 +659,6 @@
             <span class="tui-statusbar-divider"></span>
             <li on:click={toggleRange}>
                 <span>Time range: {timeRange}</span>
-            </li>
-            <span class="tui-statusbar-divider"></span>
-            <li>
-                <span>Local Data: {Object.keys(localHistoryData).length > 0 ? 'Available' : 'None'}</span>
             </li>
         </ul>
     </div>
