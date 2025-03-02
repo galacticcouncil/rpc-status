@@ -25,6 +25,7 @@
   let monitor;
   let intervalId;
   let endpointHistory = {};  // Store status history for each endpoint
+  let localHistoryData = {};  // Store local history data for charts
   let pollCount = 0;  // Count polls to determine when to update history
   let showChart = false;
 
@@ -119,26 +120,55 @@
   async function fetchHistoricalData(endpoint, range) {
     if (!browser) return;
 
-    try {
-      // Get latency data
-      const latencyResponse = await fetch(
-              `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_response_time_ms&timeRange=${range}`
-      );
-      const latencyData = await latencyResponse.json();
+    if (useBackend) {
+      try {
+        // Get latency data from backend/Prometheus
+        const latencyResponse = await fetch(
+                `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_response_time_ms&timeRange=${range}`
+        );
+        const latencyData = await latencyResponse.json();
 
-      // Get status data to identify errors
-      const statusResponse = await fetch(
-              `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_status&timeRange=${range}`
-      );
-      const statusData = await statusResponse.json();
+        // Get status data to identify errors
+        const statusResponse = await fetch(
+                `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_status&timeRange=${range}`
+        );
+        const statusData = await statusResponse.json();
 
-      if (latencyData.data?.result && statusData.data?.result) {
-        // Process and merge both datasets
-        historyData = processHistoricalData(latencyData.data.result, statusData.data.result);
+        if (latencyData.data?.result && statusData.data?.result) {
+          // Process and merge both datasets
+          historyData = processHistoricalData(latencyData.data.result, statusData.data.result);
+        }
+      } catch (error) {
+        console.error('Error fetching historical data:', error);
       }
-    } catch (error) {
-      console.error('Error fetching historical data:', error);
+    } else {
+      // Use local history data when not using backend
+      if (localHistoryData[endpoint]) {
+        // Filter data based on time range
+        const now = new Date();
+        const rangeInMs = parseTimeRange(range);
+        const filteredData = localHistoryData[endpoint].filter(d =>
+                (now - d.time) <= rangeInMs
+        );
+
+        historyData = filteredData;
+      } else {
+        historyData = [];
+      }
     }
+  }
+
+  // Helper function to parse time range string into milliseconds
+  function parseTimeRange(range) {
+    const value = parseInt(range);
+    if (range.endsWith('m')) {
+      return value * 60 * 1000; // minutes to ms
+    } else if (range.endsWith('h')) {
+      return value * 60 * 60 * 1000; // hours to ms
+    } else if (range.endsWith('d')) {
+      return value * 24 * 60 * 60 * 1000; // days to ms
+    }
+    return 3600000; // default 1 hour
   }
 
   // Process Prometheus data format to chart format
@@ -259,6 +289,24 @@
       newHistory.pop(); // Remove the oldest (rightmost) status
       newHistory.unshift(status); // Add new status at the beginning (left)
       endpointHistory[url] = newHistory;
+
+      // Update local history data for charts
+      if (!localHistoryData[url]) {
+        localHistoryData[url] = [];
+      }
+
+      // Add new data point with current timestamp
+      localHistoryData[url].push({
+        time: new Date(),
+        value: result.responseTime,
+        error: result.status !== 'success' || result.timeout
+      });
+
+      // Limit local history size (keep ~24 hours at 10s intervals = ~8640 points)
+      const maxPoints = 8640;
+      if (localHistoryData[url].length > maxPoints) {
+        localHistoryData[url] = localHistoryData[url].slice(-maxPoints);
+      }
     });
 
     // Force Svelte to detect the change
