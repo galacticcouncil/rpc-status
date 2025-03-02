@@ -1,4 +1,4 @@
-<!-- LineChart.svelte - Line chart component using D3 -->
+<!-- LineChart.svelte - Line chart component using D3 with TUI CSS styling -->
 <script>
   import { onMount, afterUpdate } from 'svelte';
   import * as d3 from 'd3';
@@ -16,12 +16,23 @@
   let width;
   let height;
 
+  // TUI specific colors
+  const colors = {
+    background: '#000080', // TUI blue background
+    text: '#ffffff',       // TUI text color
+    grid: '#aaaaaa',       // Grid lines
+    line: '#00ff00',       // Line color (green)
+    average: '#ffff00',    // Average line (yellow)
+    error: '#ff0000'       // Error indicator (red)
+  };
+
   // Create the chart on mount
   onMount(() => {
     svg = d3.select(chart)
       .append('svg')
       .attr('width', '100%')
-      .attr('height', '100%');
+      .attr('height', '100%')
+      .style('background-color', 'transparent');
 
     // Call updateChart once to set up initial structure
     updateChart();
@@ -67,6 +78,30 @@
       .domain([0, normalMax])
       .range([height, 0]);
 
+    // Add grid lines (TUI style - dotted)
+    g.append('g')
+      .attr('class', 'grid')
+      .attr('transform', `translate(0,${height})`)
+      .call(d3.axisBottom(x)
+        .ticks(10)
+        .tickSize(-height)
+        .tickFormat(''))
+      .selectAll('.tick line')
+      .style('stroke', colors.grid)
+      .style('stroke-opacity', 0.3)
+      .style('stroke-dasharray', '2,2');
+
+    g.append('g')
+      .attr('class', 'grid')
+      .call(d3.axisLeft(y)
+        .ticks(5)
+        .tickSize(-width)
+        .tickFormat(''))
+      .selectAll('.tick line')
+      .style('stroke', colors.grid)
+      .style('stroke-opacity', 0.3)
+      .style('stroke-dasharray', '2,2');
+
     // Calculate average latency (excluding errors)
     const averageLatency = d3.mean(validValues);
 
@@ -107,6 +142,9 @@
         .ticks(5)
         .tickFormat(d3.timeFormat('%H:%M')))
       .selectAll('text')
+      .style('fill', colors.text)
+      .style('font-family', '"Perfect DOS VGA", monospace')
+      .style('font-size', '10px')
       .style('text-anchor', 'end')
       .attr('dx', '-.8em')
       .attr('dy', '.15em')
@@ -114,7 +152,20 @@
 
     // Add Y axis
     g.append('g')
-      .call(d3.axisLeft(y).ticks(5));
+      .call(d3.axisLeft(y).ticks(5))
+      .selectAll('text')
+      .style('fill', colors.text)
+      .style('font-family', '"Perfect DOS VGA", monospace')
+      .style('font-size', '10px');
+
+    // Add axis lines with TUI style
+    g.selectAll('.domain')
+      .style('stroke', colors.text)
+      .style('stroke-width', '1px');
+
+    g.selectAll('.tick line')
+      .style('stroke', colors.text)
+      .style('stroke-width', '1px');
 
     // Draw each segment
     segments.forEach(segment => {
@@ -129,22 +180,24 @@
           .attr('y', 0)
           .attr('width', 10)
           .attr('height', height)
-          .attr('fill', 'rgba(255, 0, 0, 0.2)')
+          .attr('fill', colors.error)
+          .attr('fill-opacity', 0.3)
           .attr('stroke', 'none');
 
         g.append('text')
           .attr('x', x(typeof d.time === 'string' ? new Date(d.time) : d.time))
           .attr('y', 20)
           .attr('text-anchor', 'middle')
-          .attr('fill', 'red')
-          .attr('font-size', '12px')
-          .text('⚠️ Error');
+          .attr('fill', colors.error)
+          .attr('font-family', '"Perfect DOS VGA", monospace')
+          .attr('font-size', '10px')
+          .text('X');
       } else {
         // Draw normal line segment
         g.append('path')
           .datum(segment)
           .attr('fill', 'none')
-          .attr('stroke', 'steelblue')
+          .attr('stroke', colors.line)
           .attr('stroke-width', 2)
           .attr('d', line);
       }
@@ -157,8 +210,8 @@
       .append('circle')
       .attr('cx', d => x(typeof d.time === 'string' ? new Date(d.time) : d.time))
       .attr('cy', d => y(d.value))
-      .attr('r', 3)
-      .attr('fill', 'steelblue');
+      .attr('r', 2)
+      .attr('fill', colors.line);
 
     // Add average line
     g.append('line')
@@ -166,8 +219,8 @@
       .attr('x2', width)
       .attr('y1', y(averageLatency))
       .attr('y2', y(averageLatency))
-      .attr('stroke', 'red')
-      .attr('stroke-width', 1.5)
+      .attr('stroke', colors.average)
+      .attr('stroke-width', 1)
       .attr('stroke-dasharray', '5,5');
 
     // Add average label
@@ -175,8 +228,9 @@
       .attr('x', width - 5)
       .attr('y', y(averageLatency) - 5)
       .attr('text-anchor', 'end')
-      .attr('fill', 'red')
-      .attr('font-size', '12px')
+      .attr('fill', colors.average)
+      .attr('font-family', '"Perfect DOS VGA", monospace')
+      .attr('font-size', '10px')
       .text(`Avg: ${averageLatency.toFixed(2)} ms`);
 
     // Add labels
@@ -184,6 +238,9 @@
       .attr('x', width / 2)
       .attr('y', height + margin.bottom)
       .attr('text-anchor', 'middle')
+      .attr('fill', colors.text)
+      .attr('font-family', '"Perfect DOS VGA", monospace')
+      .attr('font-size', '10px')
       .text('Time');
 
     g.append('text')
@@ -191,6 +248,9 @@
       .attr('x', -height / 2)
       .attr('y', -margin.left + 15)
       .attr('text-anchor', 'middle')
+      .attr('fill', colors.text)
+      .attr('font-family', '"Perfect DOS VGA", monospace')
+      .attr('font-size', '10px')
       .text('Latency (ms)');
   }
 </script>
@@ -201,5 +261,6 @@
     .chart {
         width: 100%;
         height: 100%;
+        background-color: transparent;
     }
 </style>

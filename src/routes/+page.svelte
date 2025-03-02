@@ -6,7 +6,6 @@
   // RPC monitor imports (loaded only on client-side)
   let PolkadotRpcMonitor;
   if (browser) {
-    // Dynamic import only on browser environment
     import('../../core-monitor.js').then(module => {
       PolkadotRpcMonitor = module.PolkadotRpcMonitor;
       initMonitor();
@@ -24,10 +23,11 @@
   let useBackend = false;
   let monitor;
   let intervalId;
-  let endpointHistory = {};  // Store status history for each endpoint
-  let localHistoryData = {};  // Store local history data for charts
-  let pollCount = 0;  // Count polls to determine when to update history
+  let endpointHistory = {};
+  let localHistoryData = {};
+  let pollCount = 0;
   let showChart = false;
+  let showSettings = false;
 
   // Initialize browser monitor
   function initMonitor() {
@@ -50,10 +50,33 @@
   }
 
   onMount(() => {
-    // Monitor is initialized via dynamic import
-    // Fetch initial data from backend regardless
     if (browser) {
       fetchResultsFromBackend();
+
+      // Set up modal behavior
+      document.querySelectorAll('.tui-modal-button').forEach(button => {
+        button.addEventListener('click', () => {
+          const modalId = button.getAttribute('data-modal');
+          document.getElementById(modalId).style.display = 'block';
+          document.querySelector('.tui-overlap').style.display = 'block';
+        });
+      });
+
+      document.querySelectorAll('.tui-modal-close-button').forEach(button => {
+        button.addEventListener('click', () => {
+          const modalId = button.getAttribute('data-modal');
+          document.getElementById(modalId).style.display = 'none';
+          document.querySelector('.tui-overlap').style.display = 'none';
+        });
+      });
+
+      // Close modal when clicking on overlap (outside the modal)
+      document.querySelector('.tui-overlap').addEventListener('click', () => {
+        document.querySelectorAll('.tui-modal').forEach(modal => {
+          modal.style.display = 'none';
+        });
+        document.querySelector('.tui-overlap').style.display = 'none';
+      });
     }
   });
 
@@ -84,16 +107,36 @@
       monitor.start(CHECK_INTERVAL);
     }
 
-    // Refresh chart when data source changes if chart is visible
+    // Refresh chart data if chart is visible
     if (showChart && selectedEndpoint) {
       fetchHistoricalData(selectedEndpoint, timeRange);
     }
   }
 
   // Fetch historical data when endpoint or time range changes
-  $: if (browser && selectedEndpoint) {
+  $: if (browser && selectedEndpoint && showChart) {
     fetchHistoricalData(selectedEndpoint, timeRange);
-    showChart = true;
+  }
+
+  // Toggle settings menu
+  function toggleSettings() {
+    showSettings = !showSettings;
+  }
+
+  // Select a time range and close menu
+  function selectTimeRange(range) {
+    timeRange = range;
+    showSettings = false;
+
+    if (showChart && selectedEndpoint) {
+      fetchHistoricalData(selectedEndpoint, timeRange);
+    }
+  }
+
+  // Toggle backend use and close menu
+  function toggleBackend() {
+    useBackend = !useBackend;
+    showSettings = false;
   }
 
   // Fetch results from backend
@@ -218,18 +261,28 @@
     return sortedData;
   }
 
-  // Handle endpoint selection
+  // Handle endpoint selection for chart modal
   function handleEndpointSelect(endpoint) {
     selectedEndpoint = endpoint.url;
     selectedEndpointName = endpoint.name;
     showChart = true;
+
+    if (browser) {
+      // Open the modal
+      document.getElementById('chart-modal').style.display = 'block';
+      document.querySelector('.tui-overlap').style.display = 'block';
+
+      // Fetch data
+      fetchHistoricalData(endpoint.url, timeRange);
+    }
   }
 
-  // Handle closing the chart
-  function closeChart() {
-    showChart = false;
-    selectedEndpoint = null;
-    selectedEndpointName = null;
+  // Handle closing the chart modal
+  function closeChartModal() {
+    if (browser) {
+      document.getElementById('chart-modal').style.display = 'none';
+      document.querySelector('.tui-overlap').style.display = 'none';
+    }
   }
 
   // Calculate maximum block height
@@ -276,8 +329,6 @@
 
   // Update status history and refresh chart if needed
   function updateEndpointHistory(newResults) {
-    // Update on every poll for more immediate feedback
-
     // Update history for each endpoint
     newResults.forEach(result => {
       const url = result.endpoint.url;
@@ -328,211 +379,202 @@
   <title>Hydration RPC Monitor</title>
 </svelte:head>
 
-<main>
-  <header>
-    <h1>Hydration RPC Monitor</h1>
-    <div class="controls">
-      {#if browser}
-        <label>
-          <input
-                  type="checkbox"
-                  bind:checked={useBackend}
-          />
-          Use Backend Data Source
-        </label>
-      {/if}
+<main class="tui-bg-blue-black">
+  <div class="tui-window">
+    <!-- Menu bar with improved contrast -->
+    <div class="tui-menubar">
+      <div class="tui-menu">
+        <span class="tui-menu-btn" on:click={toggleSettings}>Settings</span>
+        {#if showSettings}
+          <div class="tui-menu-content">
+            <span class="tui-menu-item" on:click={toggleBackend}>
+              {useBackend ? '✓ Use Backend Data' : '◯ Use Backend Data'}
+            </span>
 
-      <select bind:value={timeRange}>
-        <option value="15m">Last 15 minutes</option>
-        <option value="1h">Last hour</option>
-        <option value="3h">Last 3 hours</option>
-        <option value="12h">Last 12 hours</option>
-        <option value="24h">Last 24 hours</option>
-      </select>
+            <div class="tui-menu-divider"></div>
+
+            <span class="tui-menu-item" class:tui-menu-active={timeRange === '15m'} on:click={() => selectTimeRange('15m')}>
+              Last 15 minutes
+            </span>
+            <span class="tui-menu-item" class:tui-menu-active={timeRange === '1h'} on:click={() => selectTimeRange('1h')}>
+              Last hour
+            </span>
+            <span class="tui-menu-item" class:tui-menu-active={timeRange === '3h'} on:click={() => selectTimeRange('3h')}>
+              Last 3 hours
+            </span>
+            <span class="tui-menu-item" class:tui-menu-active={timeRange === '12h'} on:click={() => selectTimeRange('12h')}>
+              Last 12 hours
+            </span>
+            <span class="tui-menu-item" class:tui-menu-active={timeRange === '24h'} on:click={() => selectTimeRange('24h')}>
+              Last 24 hours
+            </span>
+          </div>
+        {/if}
+      </div>
     </div>
-  </header>
 
-  {#if showChart && selectedEndpoint}
-    <section class="historical-data">
-      <div class="section-header">
-        <h2>Historical Latency Data for {selectedEndpointName} ({selectedEndpoint})</h2>
-        <button class="close-button" on:click={closeChart}>×</button>
-      </div>
-      <div class="chart-container">
-        <LineChart data={processChartData(historyData)} />
-      </div>
-    </section>
-  {/if}
+    <!-- Window header with high-contrast colors -->
+    <div class="tui-window-header tui-bg-blue tui-fg-white">
+      <span>Hydration RPC Monitor - System Status</span>
+    </div>
 
-  <section class="current-status">
-    <h2>RPC Endpoints Status</h2>
-    <table>
-      <thead>
-      <tr>
-        <th>Name</th>
-        <th>URL</th>
-        <th>Block Height</th>
-        <th>Response Time</th>
-        <th>Status</th>
-      </tr>
-      </thead>
-      <tbody>
-      {#each results as result, index (index)}
-        <tr
-                class={getRowClass(result)}
-                on:click={() => handleEndpointSelect(result.endpoint)}
-        >
-          <td>{result.endpoint.name}</td>
-          <td>{result.endpoint.url}</td>
-          <td>{result.blockHeight || 'N/A'}</td>
-          <td>{result.responseTime.toFixed(2)} ms</td>
-          <td class="history-icons">
-            {#if endpointHistory[result.endpoint.url]}
-              {#each endpointHistory[result.endpoint.url] as status}
-                <span class="status-icon {status}" title="{status}"></span>
+    <!-- Content -->
+    <div class="tui-window-content" style="padding: 5px;">
+      <!-- RPC status table -->
+      <div class="tui-panel rpc-panel" style="width: 100%;">
+        <div class="tui-panel-header tui-bg-blue tui-fg-white">RPC Endpoints Status</div>
+        <div class="tui-panel-content" style="padding: 0;">
+          <div class="tui-table-container">
+            <table class="tui-table">
+              <thead>
+              <tr>
+                <th>Name</th>
+                <th>URL</th>
+                <th>Block Height</th>
+                <th>Response Time</th>
+                <th>Status</th>
+              </tr>
+              </thead>
+              <tbody>
+              {#each results as result, index (index)}
+                <tr
+                        class={getRowClass(result)}
+                        on:click={() => handleEndpointSelect(result.endpoint)}
+                        style="cursor: pointer;"
+                >
+                  <td>{result.endpoint.name}</td>
+                  <td>{result.endpoint.url}</td>
+                  <td>{result.blockHeight || 'N/A'}</td>
+                  <td>{result.responseTime.toFixed(2)} ms</td>
+                  <td>
+                    <div style="display: flex; align-items: center;">
+                      {#if endpointHistory[result.endpoint.url]}
+                        {#each endpointHistory[result.endpoint.url] as status}
+                          <span class={`status-icon ${status}`} title={status}></span>
+                        {/each}
+                      {:else}
+                        {#each Array(7).fill('unknown') as _}
+                          <span class="status-icon unknown" title="No data yet"></span>
+                        {/each}
+                      {/if}
+                    </div>
+                  </td>
+                </tr>
               {/each}
-            {:else}
-              <!-- Display 7 unknown status icons if no history yet -->
-              {#each Array(7).fill('unknown') as _}
-                <span class="status-icon unknown" title="No data yet"></span>
-              {/each}
-            {/if}
-          </td>
-        </tr>
-      {/each}
-      </tbody>
-    </table>
-  </section>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tui-statusbar">
+      <span>F1:Help</span>
+      <span>F5:Refresh</span>
+      <span>Time range: {timeRange}</span>
+      <span>Data source: {useBackend ? 'Backend' : 'Local'}</span>
+      <span class="tui-statusbar-right">{new Date().toLocaleTimeString()}</span>
+    </div>
+  </div>
+
+  <!-- Overlap for modal -->
+  <div class="tui-overlap"></div>
+
+  <!-- Chart Modal window -->
+  <div id="chart-modal" class="tui-modal">
+    <div class="tui-window modal-centered" style="width: 80%; max-width: 900px; height: auto; max-height: 80%;">
+      <fieldset class="tui-fieldset">
+        <legend class="tui-bg-blue tui-fg-white">Historical Latency Data: {selectedEndpointName}</legend>
+
+        <div class="chart-container" style="height: 400px; margin-bottom: 15px;">
+          {#if historyData.length > 0}
+            <LineChart data={processChartData(historyData)} />
+          {:else}
+            <div class="tui-panel" style="height: 100%;">
+              <div class="tui-panel-content" style="display: flex; justify-content: center; align-items: center; height: 100%;">
+                <p>Loading chart data...</p>
+              </div>
+            </div>
+          {/if}
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span>Endpoint: {selectedEndpoint}</span>
+          </div>
+          <div>
+            <button class="tui-button tui-modal-close-button" on:click={closeChartModal} data-modal="chart-modal">
+              Close
+            </button>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+  </div>
 </main>
 
 <style>
   main {
-    font-family: sans-serif;
-    max-width: 1200px;
-    margin: 0 auto;
+    height: 100vh;
     padding: 20px;
+    overflow: auto;
   }
 
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
+  /* Custom styles for TUI CSS */
+  .success { color: var(--success-color); }
+  .warning { color: var(--warning-color); }
+  .error { color: var(--error-color); }
+  .timeout { color: var(--timeout-color); }
+
+  .tui-window {
+    width: calc(100% - 10px);
+    height: calc(100% - 30px);
   }
 
-  .controls {
-    display: flex;
-    gap: 20px;
-    align-items: center;
-  }
-
-  table {
+  /* Make table more readable */
+  .tui-table {
     width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 20px;
   }
 
-  th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
+  .tui-table tr:hover {
+    background-color: var(--tui-bg-highlighted);
   }
 
-  th {
-    background-color: #f2f2f2;
-  }
-
-  tr:hover {
-    background-color: #f5f5f5;
-    cursor: pointer;
-  }
-
-  tr.success td {
-    background-color: rgba(0, 128, 0, 0.1);
-  }
-
-  tr.error td {
-    background-color: rgba(255, 0, 0, 0.1);
-  }
-
-  tr.warning td {
-    background-color: rgba(255, 191, 0, 0.2);
-  }
-
-  tr.timeout td {
-    background-color: rgba(128, 0, 128, 0.1); /* Purple-ish for timeouts */
-  }
-
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .close-button {
-    background: #f44336;
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    font-size: 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .close-button:hover {
-    background: #d32f2f;
-  }
-
-  .chart-container {
-    height: 300px;
-    width: 100%;
-    margin-bottom: 30px;
-  }
-
-  .historical-data {
-    border: 1px solid #ddd;
-    padding: 15px;
-    border-radius: 4px;
-    margin-bottom: 20px;
-    background-color: #fff;
-  }
-
-  /* Status history icons styling */
-  .history-icons {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-  }
-
+  /* Status indicators */
   .status-icon {
     display: inline-block;
-    width: 12px;
-    height: 12px;
+    width: 8px;
+    height: 8px;
+    margin-right: 3px;
     border-radius: 50%;
-    border: 1px solid rgba(0, 0, 0, 0.2);
   }
 
-  .status-icon.success {
-    background-color: #2ecc71;
+  /* Modal initial state */
+  .tui-modal, .tui-overlap {
+    display: none;
   }
 
-  .status-icon.warning {
-    background-color: #f39c12;
+  /* Modal centering */
+  .modal-centered {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
   }
 
-  .status-icon.error {
-    background-color: #e74c3c;
+  /* Chart container */
+  .chart-container {
+    width: 100%;
+    min-height: 400px;
   }
 
-  .status-icon.timeout {
-    background-color: #9b59b6; /* Purple for timeout */
+  /* Custom TUI Menu styles */
+  .tui-menu-btn {
+    cursor: pointer;
+    padding: 0 10px;
   }
 
-  .status-icon.unknown {
-    background-color: #bdc3c7;
+  .tui-menu-active {
+    background-color: var(--tui-bg-highlighted);
   }
 </style>
