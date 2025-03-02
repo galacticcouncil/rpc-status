@@ -1,5 +1,5 @@
 <script>
-  import {onMount, onDestroy} from 'svelte';
+  import {onDestroy, onMount} from 'svelte';
   import {browser} from '$app/environment';
 
   // RPC monitor imports (loaded only on client-side)
@@ -32,9 +32,7 @@
   let endpointHistory = {};
   let endpointErrors = {}; // New: Store error details for each endpoint
   let localHistoryData = {};
-  let pollCount = 0;
   let showChart = false;
-  let showSettings = false;
   let showErrors = false; // New: Toggle for error display
   let currentTime = new Date(); // For time display
   let lastSaveTime = 0; // To limit save frequency
@@ -523,11 +521,9 @@
         // Filter data based on time range
         const now = new Date();
         const rangeInMs = parseTimeRange(range);
-        const filteredData = localHistoryData[endpoint].filter(d =>
+        historyData = localHistoryData[endpoint].filter(d =>
           (now - d.time) <= rangeInMs
         );
-
-        historyData = filteredData;
       } else {
         historyData = [];
       }
@@ -809,13 +805,16 @@
     return timestamp.toLocaleString();
   }
 
-  // Sort results by average latency
   $: sortedResults = [...results].sort((a, b) => {
     const aMetrics = endpointMetrics[a.endpoint.url];
     const bMetrics = endpointMetrics[b.endpoint.url];
 
-    // Sort by average latency - lowest first
-    // If no metrics available, put these at the end
+    // Sort by block number first
+    if (b.blockHeight !== a.blockHeight) {
+      return (b.blockHeight || 0) - (a.blockHeight || 0);
+    }
+
+    // If block numbers are equal, sort by average latency
     if (!aMetrics && !bMetrics) return 0;
     if (!aMetrics) return 1;
     if (!bMetrics) return -1;
@@ -921,6 +920,7 @@
                     <thead>
                     <tr>
                         <th>Name</th>
+                        <th class="loc-column">Location</th>
                         <th class="url-column">URL</th>
                         <th>Block</th>
                         <th>Latency</th>
@@ -938,15 +938,16 @@
                                 style="cursor: pointer;"
                         >
                             <td>{result.endpoint.name}</td>
+                            <td class="loc-column">{result.endpoint.location}</td>
                             <td class="url-column">{result.endpoint.url}</td>
-                            <td>{result.blockHeight || 'N/A'}</td>
+                            <td>{result.blockHeight || '?'}</td>
                             <td>{result.responseTime.toFixed(0)} ms</td>
                             {#if !useBackend}
                                 <td class="metrics-column">
                                     {#if endpointMetrics[result.endpoint.url]?.avgLatency !== undefined && endpointMetrics[result.endpoint.url]?.avgLatency !== Infinity}
                                         {endpointMetrics[result.endpoint.url].avgLatency.toFixed(0)} ms
                                     {:else}
-                                        N/A
+                                        ?
                                     {/if}
 
                                 </td>
@@ -954,7 +955,7 @@
                                     {#if endpointMetrics[result.endpoint.url]?.uptime !== undefined}
                                         {endpointMetrics[result.endpoint.url].uptime.toFixed(1)}%
                                     {:else}
-                                        N/A
+                                        ?
                                     {/if}
                                 </td>
                             {/if}
@@ -1088,9 +1089,25 @@
                         <span class="stat-label">Uptime:</span>
                         <span class="stat-value">
                             {#if historyData.length > 0}
-                                {(100 - (historyData.filter(d => d.error).length / historyData.length * 100)).toFixed(0)}% ({historyData.filter(d => d.error).length}:{historyData.length})
+                                {(100 - (historyData.filter(d => d.error).length / historyData.length * 100)).toFixed(0)}%
                             {:else}
-                                N/A
+                                ?
+                            {/if}
+                        </span>
+                        <span class="stat-label">Requests:</span>
+                        <span class="stat-value">
+                            {#if historyData.length > 0}
+                                {historyData.length}
+                            {:else}
+                                ?
+                            {/if}
+                        </span>
+                        <span class="stat-label">Errors:</span>
+                        <span class="stat-value">
+                            {#if historyData.length > 0}
+                                {historyData.filter(d => d.error).length}
+                            {:else}
+                                ?
                             {/if}
                         </span>
                     </div>
@@ -1100,7 +1117,7 @@
                             {#if historyData.filter(d => !d.error).length > 0}
                                 {(historyData.filter(d => !d.error).reduce((sum, d) => sum + d.value, 0) / historyData.filter(d => !d.error).length).toFixed(2)} ms
                             {:else}
-                                N/A
+                                ?
                             {/if}
                         </span>
                     </div>
@@ -1202,8 +1219,12 @@
     }
 
     /* Hide URL column and metrics columns on narrow screens */
-    @media (max-width: 768px) {
+    @media (max-width: 950px) {
         .url-column {
+            display: none;
+        }
+
+        .loc-column {
             display: none;
         }
 
