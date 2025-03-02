@@ -22,6 +22,7 @@
   let useBackend = false;
   let monitor;
   let intervalId;
+  let timeIntervalId; // For time updates
   let endpointHistory = {};
   let localHistoryData = {};
   let pollCount = 0;
@@ -59,6 +60,11 @@
     if (browser) {
       fetchResultsFromBackend();
 
+      // Set up time update every second
+      timeIntervalId = setInterval(() => {
+        currentTime = new Date();
+      }, 1000);
+
       // Set up modal behavior
       document.querySelectorAll('.tui-modal-button').forEach(button => {
         button.addEventListener('click', () => {
@@ -85,6 +91,10 @@
 
       if (intervalId) {
         clearInterval(intervalId);
+      }
+
+      if (timeIntervalId) {
+        clearInterval(timeIntervalId);
       }
     }
   });
@@ -266,7 +276,7 @@
 
   // Format time for chart labels
   function formatTimeLabel(time) {
-    return time.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    return time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   }
 
   // Calculate max value for chart scaling
@@ -393,7 +403,6 @@
 <svelte:head>
     <title>Hydration RPC Status</title>
 </svelte:head>
-
 
 <nav class="tui-nav">
     <div class="tui-panel-header tui-bg-blue tui-fg-white">Hydration RPC Status</div>
@@ -616,18 +625,13 @@
         left: 50%;
         transform: translate(-50%, -50%);
     }
-    /* Custom TUI Menu styles */
-    .tui-menu-btn {
-        cursor: pointer;
-        padding: 0 10px;
-    }
 
     .tui-menu-active {
         background-color: var(--tui-bg-highlighted);
     }
 
     /* Hide URL column on narrow screens */
-    @media (max-width: 1000px) {
+    @media (max-width: 768px) {
         .url-column {
             display: none;
         }
