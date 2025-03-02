@@ -83,6 +83,11 @@
       }
       monitor.start(CHECK_INTERVAL);
     }
+
+    // Refresh chart when data source changes if chart is visible
+    if (showChart && selectedEndpoint) {
+      fetchHistoricalData(selectedEndpoint, timeRange);
+    }
   }
 
   // Fetch historical data when endpoint or time range changes
