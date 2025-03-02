@@ -23,6 +23,8 @@
   let useBackend = false;
   let monitor;
   let intervalId;
+  let endpointHistory = {};  // Store status history for each endpoint
+  let pollCount = 0;  // Count polls to determine when to update history
 
   // Initialize browser monitor
   function initMonitor() {
@@ -32,6 +34,7 @@
 
     monitor.setUpdateCallback(newResults => {
       results = newResults;
+      updateEndpointHistory(newResults);
     });
 
     // Start monitoring based on initial useBackend setting
@@ -92,6 +95,7 @@
       const response = await fetch('/api/status');
       const data = await response.json();
       results = data;
+      updateEndpointHistory(data);
     } catch (error) {
       console.error('Error fetching from backend:', error);
     }
@@ -143,29 +147,66 @@
   }
 
   // Calculate maximum block height
-  $: maxBlockHeight = Math.max(
-          ...results
-                  .filter(result => result.status === 'success' && result.blockHeight !== undefined)
-                  .map(result => result.blockHeight),
-          0
-  );
+  $: maxBlockHeight = results.length > 0
+          ? Math.max(
+                  ...results
+                          .filter(result => result.status === 'success' && result.blockHeight !== undefined)
+                          .map(result => result.blockHeight),
+                  0
+          )
+          : 0;
 
-  // Function to determine row class based on status and block height
-  function getRowClass(result) {
+  // Helper function to categorize status
+  function categorizeStatus(result) {
+    // If the endpoint is down or has an error
     if (result.status !== 'success') {
       return 'error';
     }
 
+    // If block height isn't reported but status is success
     if (result.blockHeight === undefined) {
       return 'success';
     }
 
-    // More than 2 blocks behind the maximum height
-    if (maxBlockHeight - result.blockHeight > 2) {
+    // Only mark as warning if maxBlockHeight is valid and this endpoint
+    // is significantly behind (more than 2 blocks)
+    if (maxBlockHeight > 0 && (maxBlockHeight - result.blockHeight) > 2) {
       return 'warning';
     }
 
+    // Default to success for any other case
     return 'success';
+  }
+
+  // Function to determine row class based on status and block height
+  function getRowClass(result) {
+    return categorizeStatus(result);
+  }
+
+  // Update status history
+  function updateEndpointHistory(newResults) {
+    // Update on every poll for more immediate feedback
+
+    // Update history for each endpoint
+    newResults.forEach(result => {
+      const url = result.endpoint.url;
+      const status = categorizeStatus(result);
+
+      // Initialize history array if needed
+      if (!endpointHistory[url]) {
+        // Initialize with 7 "unknown" statuses
+        endpointHistory[url] = Array(7).fill("unknown");
+      }
+
+      // Shift existing statuses to the right (newest always at index 0)
+      const newHistory = [...endpointHistory[url]];
+      newHistory.pop(); // Remove the oldest (rightmost) status
+      newHistory.unshift(status); // Add new status at the beginning (left)
+      endpointHistory[url] = newHistory;
+    });
+
+    // Force Svelte to detect the change
+    endpointHistory = {...endpointHistory};
   }
 </script>
 
@@ -219,7 +260,18 @@
           <td>{result.endpoint.url}</td>
           <td>{result.blockHeight || 'N/A'}</td>
           <td>{result.responseTime.toFixed(2)} ms</td>
-          <td>{result.status}</td>
+          <td class="history-icons">
+            {#if endpointHistory[result.endpoint.url]}
+              {#each endpointHistory[result.endpoint.url] as status}
+                <span class="status-icon {status}" title="{status}"></span>
+              {/each}
+            {:else}
+              <!-- Display 7 unknown status icons if no history yet -->
+              {#each Array(7).fill('unknown') as _}
+                <span class="status-icon unknown" title="No data yet"></span>
+              {/each}
+            {/if}
+          </td>
         </tr>
       {/each}
       </tbody>
@@ -293,5 +345,36 @@
   .chart-container {
     height: 300px;
     width: 100%;
+  }
+
+  /* Status history icons styling */
+  .history-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .status-icon {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+  }
+
+  .status-icon.success {
+    background-color: #2ecc71;
+  }
+
+  .status-icon.warning {
+    background-color: #f39c12;
+  }
+
+  .status-icon.error {
+    background-color: #e74c3c;
+  }
+
+  .status-icon.unknown {
+    background-color: #bdc3c7;
   }
 </style>
