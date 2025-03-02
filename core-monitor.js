@@ -50,6 +50,7 @@ class PolkadotRpcMonitor {
           endpoint,
           status: 'error',
           error: `HTTP error ${response.status}`,
+          details: response,
           responseTime
         };
       }
@@ -61,6 +62,7 @@ class PolkadotRpcMonitor {
           endpoint,
           status: 'error',
           error: data.error.message || JSON.stringify(data.error),
+          details: data,
           responseTime
         };
       }
@@ -94,6 +96,7 @@ class PolkadotRpcMonitor {
         endpoint,
         status: 'error',
         error: error.message || String(error),
+        details: error,
         responseTime: endTime - startTime
       };
     }

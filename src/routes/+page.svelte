@@ -14,7 +14,9 @@
   const CHECK_INTERVAL = 10000; // 10 seconds
   const LOCAL_STORAGE_KEY = 'hydration-rpc-monitor-data';
   const LOCAL_STORAGE_ENDPOINT_HISTORY_KEY = 'hydration-rpc-endpoint-history';
-  const MAX_STORAGE_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+  const LOCAL_STORAGE_ENDPOINT_ERRORS_KEY = 'hydration-rpc-endpoint-errors';
+  const MAX_STORAGE_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+  const MAX_ERROR_ENTRIES = 500; // Maximum number of error entries to store per endpoint
 
   // State variables
   let results = [];
@@ -28,10 +30,12 @@
   let intervalId;
   let timeIntervalId; // For time updates
   let endpointHistory = {};
+  let endpointErrors = {}; // New: Store error details for each endpoint
   let localHistoryData = {};
   let pollCount = 0;
   let showChart = false;
   let showSettings = false;
+  let showErrors = false; // New: Toggle for error display
   let currentTime = new Date(); // For time display
   let lastSaveTime = 0; // To limit save frequency
   let endpointMetrics = {}; // Store calculated metrics for each endpoint
@@ -73,6 +77,31 @@
         console.log('Loaded endpoint history from localStorage');
       }
 
+      // Load endpoint errors (new)
+      const savedErrors = localStorage.getItem(LOCAL_STORAGE_ENDPOINT_ERRORS_KEY);
+      if (savedErrors) {
+        const parsedErrors = JSON.parse(savedErrors);
+
+        // Convert string dates back to Date objects
+        Object.keys(parsedErrors).forEach(endpoint => {
+          if (Array.isArray(parsedErrors[endpoint])) {
+            parsedErrors[endpoint] = parsedErrors[endpoint].map(item => ({
+              ...item,
+              timestamp: new Date(item.timestamp)
+            }));
+
+            // Filter out errors older than MAX_STORAGE_AGE_MS
+            const cutoffTime = new Date().getTime() - MAX_STORAGE_AGE_MS;
+            parsedErrors[endpoint] = parsedErrors[endpoint].filter(item =>
+              item.timestamp.getTime() >= cutoffTime
+            );
+          }
+        });
+
+        endpointErrors = parsedErrors;
+        console.log('Loaded endpoint errors from localStorage');
+      }
+
       // Calculate metrics after loading data
       calculateEndpointMetrics();
     } catch (error) {
@@ -80,6 +109,7 @@
       // If data is corrupted, reset it
       localHistoryData = {};
       endpointHistory = {};
+      endpointErrors = {}; // Reset errors too
     }
   }
 
@@ -95,6 +125,7 @@
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localHistoryData));
       localStorage.setItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY, JSON.stringify(endpointHistory));
+      localStorage.setItem(LOCAL_STORAGE_ENDPOINT_ERRORS_KEY, JSON.stringify(endpointErrors)); // Save errors
     } catch (error) {
       console.error('Error saving to localStorage:', error);
 
@@ -105,6 +136,7 @@
         try {
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localHistoryData));
           localStorage.setItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY, JSON.stringify(endpointHistory));
+          localStorage.setItem(LOCAL_STORAGE_ENDPOINT_ERRORS_KEY, JSON.stringify(endpointErrors));
         } catch (retryError) {
           console.error('Still unable to save after pruning:', retryError);
         }
@@ -122,6 +154,15 @@
       if (Array.isArray(localHistoryData[endpoint])) {
         localHistoryData[endpoint] = localHistoryData[endpoint].filter(item =>
           item.time.getTime() >= cutoffTime
+        );
+      }
+    });
+
+    // Also prune error data
+    Object.keys(endpointErrors).forEach(endpoint => {
+      if (Array.isArray(endpointErrors[endpoint])) {
+        endpointErrors[endpoint] = endpointErrors[endpoint].filter(item =>
+          item.timestamp.getTime() >= cutoffTime
         );
       }
     });
@@ -160,7 +201,8 @@
             avgLatency: avgLatency !== null ? avgLatency : Infinity,
             uptime: uptime,
             dataPoints: recentData.length,
-            remote: false // Flag as local source
+            remote: false, // Flag as local source
+            errorCount: recentData.filter(item => item.error).length // Track error count
           };
         }
       }
@@ -176,7 +218,8 @@
       timestamp: new Date().toISOString(),
       version: '1.0',
       historyData: localHistoryData,
-      endpointHistory: endpointHistory
+      endpointHistory: endpointHistory,
+      endpointErrors: endpointErrors // Include error data in export
     };
 
     // Convert to JSON string
@@ -234,9 +277,22 @@
           }
         });
 
+        // Process imported error data if it exists
+        if (importedData.endpointErrors) {
+          Object.keys(importedData.endpointErrors).forEach(endpoint => {
+            if (Array.isArray(importedData.endpointErrors[endpoint])) {
+              importedData.endpointErrors[endpoint] = importedData.endpointErrors[endpoint].map(item => ({
+                ...item,
+                timestamp: new Date(item.timestamp)
+              }));
+            }
+          });
+        }
+
         // Merge with existing data
         localHistoryData = { ...localHistoryData, ...importedData.historyData };
         endpointHistory = { ...endpointHistory, ...importedData.endpointHistory };
+        endpointErrors = { ...endpointErrors, ...(importedData.endpointErrors || {}) };
 
         // Save merged data
         saveLocalData();
@@ -275,7 +331,7 @@
 
       // Update metrics based on data source
       if (useBackend) {
-        fetchMetricsFromBackend();
+        fetchResultsFromBackend();
       } else {
         calculateEndpointMetrics();
       }
@@ -385,7 +441,7 @@
 
     // Recalculate metrics when time range changes
     if (useBackend) {
-      fetchMetricsFromBackend();
+      fetchResultsFromBackend();
     } else {
       calculateEndpointMetrics();
     }
@@ -397,6 +453,11 @@
     if (timeRange === '3h') return selectTimeRange('12h');
     if (timeRange === '12h') return selectTimeRange('24h');
     if (timeRange === '24h') return selectTimeRange('15m');
+  }
+
+  // Toggle between chart and errors view
+  function toggleErrorsView() {
+    showErrors = !showErrors;
   }
 
   // Toggle backend use and close menu
@@ -550,6 +611,7 @@
     selectedEndpoint = endpoint.url;
     selectedEndpointName = endpoint.name;
     showChart = true;
+    showErrors = false; // Reset to chart view when selecting an endpoint
 
     if (browser) {
       // Just open the modal, use cached data only
@@ -656,10 +718,34 @@
       if (localHistoryData[url].length > maxPoints) {
         localHistoryData[url] = localHistoryData[url].slice(-maxPoints);
       }
+
+      // Update error history if there's an error
+      if (result.status !== 'success' || result.timeout) {
+        if (!endpointErrors[url]) {
+          endpointErrors[url] = [];
+        }
+
+        // Add error details
+        endpointErrors[url].push({
+          timestamp: new Date(),
+          errorType: result.timeout ? 'timeout' : 'error',
+          message: result.error || 'Unknown error',
+          details: result.details,
+          responseTime: result.responseTime
+        });
+
+        console.log('error', result)
+
+        // Limit error history size
+        if (endpointErrors[url].length > MAX_ERROR_ENTRIES) {
+          endpointErrors[url] = endpointErrors[url].slice(-MAX_ERROR_ENTRIES);
+        }
+      }
     });
 
     // Force Svelte to detect the change
     endpointHistory = {...endpointHistory};
+    endpointErrors = {...endpointErrors};
 
     // Save to localStorage (throttled internally)
     saveLocalData();
@@ -684,10 +770,12 @@
     // Clear data from localStorage
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     localStorage.removeItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_ENDPOINT_ERRORS_KEY);
 
     // Clear memory variables
     localHistoryData = {};
     endpointHistory = {};
+    endpointErrors = {};
     endpointMetrics = {};
 
     // Update UI to reflect cleared data
@@ -696,6 +784,29 @@
     }
 
     console.log('Local data cleared');
+  }
+
+  // Get recent errors for the selected endpoint
+  function getRecentErrors(endpoint, timeWindow = null) {
+    if (!endpointErrors[endpoint] || !Array.isArray(endpointErrors[endpoint])) {
+      return [];
+    }
+
+    // If timeWindow is specified, filter by time
+    if (timeWindow) {
+      const now = new Date().getTime();
+      return endpointErrors[endpoint]
+        .filter(error => (now - error.timestamp.getTime()) <= timeWindow)
+        .sort((a, b) => b.timestamp - a.timestamp); // Sort newest first
+    }
+
+    // Otherwise return all errors, newest first
+    return [...endpointErrors[endpoint]].sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  // Format error timestamp
+  function formatErrorTime(timestamp) {
+    return timestamp.toLocaleString();
   }
 
   // Sort results by average latency
@@ -711,6 +822,14 @@
 
     return aMetrics.avgLatency - bMetrics.avgLatency;
   });
+
+  // Get current errors for selected endpoint
+  $: currentErrors = selectedEndpoint ?
+    getRecentErrors(selectedEndpoint, parseTimeRange(timeRange)) :
+    [];
+
+  // Count errors in selected timeframe
+  $: errorCount = currentErrors.length;
 </script>
 
 <svelte:head>
@@ -805,13 +924,15 @@
                         <th class="url-column">URL</th>
                         <th>Block</th>
                         <th>Latency</th>
-                        <th class="metrics-column">Average</th>
-                        <th class="metrics-column">Uptime</th>
+                        {#if !useBackend}
+                            <th class="metrics-column">Average</th>
+                            <th class="metrics-column">Uptime</th>
+                        {/if}
                         <th>Status</th>
                     </tr>
                     </thead>
                     <tbody>
-                    {#each sortedResults as result, index (index)}
+                    {#each useBackend ? results : sortedResults as result, index (index)}
                         <tr
                                 on:click={() => handleEndpointSelect(result.endpoint)}
                                 style="cursor: pointer;"
@@ -820,20 +941,23 @@
                             <td class="url-column">{result.endpoint.url}</td>
                             <td>{result.blockHeight || 'N/A'}</td>
                             <td>{result.responseTime.toFixed(0)} ms</td>
-                            <td class="metrics-column">
-                                {#if endpointMetrics[result.endpoint.url]?.avgLatency !== undefined && endpointMetrics[result.endpoint.url]?.avgLatency !== Infinity}
-                                    {endpointMetrics[result.endpoint.url].avgLatency.toFixed(0)} ms
-                                {:else}
-                                    N/A
-                                {/if}
-                            </td>
-                            <td class="metrics-column">
-                                {#if endpointMetrics[result.endpoint.url]?.uptime !== undefined}
-                                    {endpointMetrics[result.endpoint.url].uptime.toFixed(1)}%
-                                {:else}
-                                    N/A
-                                {/if}
-                            </td>
+                            {#if !useBackend}
+                                <td class="metrics-column">
+                                    {#if endpointMetrics[result.endpoint.url]?.avgLatency !== undefined && endpointMetrics[result.endpoint.url]?.avgLatency !== Infinity}
+                                        {endpointMetrics[result.endpoint.url].avgLatency.toFixed(0)} ms
+                                    {:else}
+                                        N/A
+                                    {/if}
+
+                                </td>
+                                <td class="metrics-column">
+                                    {#if endpointMetrics[result.endpoint.url]?.uptime !== undefined}
+                                        {endpointMetrics[result.endpoint.url].uptime.toFixed(1)}%
+                                    {:else}
+                                        N/A
+                                    {/if}
+                                </td>
+                            {/if}
                             <td width="80px">
                                 <div style="display: flex; align-items: center;">
                                     {#if endpointHistory[result.endpoint.url]}
@@ -874,43 +998,90 @@
                 <legend class="">{selectedEndpointName}</legend>
                 <button on:click={closeChartModal} class="tui-fieldset-button right"><span>■</span></button>
 
-                <div style="margin-bottom: 25px;">
-                    {#if historyData.length > 0}
-                        <!-- TUI Vertical Chart -->
-                        {@const chartData = processHistoryDataForTuiChart(historyData)}
-                        {@const maxLatency = getMaxLatency(chartData)}
+                <!-- Tab buttons -->
+<!--                <div class="tui-tabs">-->
+<!--                    <ul>-->
+<!--                        <li><a class="tui-tab" class:tui-tab-active={!showErrors} on:click={() => showErrors = false}>Chart</a></li>-->
+<!--                        <li><a class="tui-tab" class:tui-tab-active={showErrors} on:click={() => showErrors = true}>Errors ({errorCount})</a></li>-->
+<!--                    </ul>-->
+<!--                </div>-->
 
-                        <div class="tui-chart-vertical" style="width: 100%; height: 350px;">
-                            <div class="tui-chart-display">
-                                {#each chartData as dataPoint, i}
-                                    <div class="tui-chart-value {dataPoint.error ? 'red-168' : 'green-168'}"
-                                         style="height: {Math.min(100, (dataPoint.value / maxLatency * 100)).toFixed(1)}%; {dataPoint.error ? 'background-color: var(--error-color);' : ''}">
-                                        {dataPoint.value.toFixed(0)} ms
-                                    </div>
-                                {/each}
+                {#if !showErrors}
+                    <!-- Chart view -->
+                    <div style="margin-bottom: 25px;">
+                        {#if historyData.length > 0}
+                            <!-- TUI Vertical Chart -->
+                            {@const chartData = processHistoryDataForTuiChart(historyData)}
+                            {@const maxLatency = getMaxLatency(chartData)}
+
+                            <div class="tui-chart-vertical" style="width: 100%; height: 350px;">
+                                <div class="tui-chart-display">
+                                    {#each chartData as dataPoint, i}
+                                        <div class="tui-chart-value {dataPoint.error ? 'red-168' : 'green-168'}"
+                                             style="height: {Math.min(100, (dataPoint.value / maxLatency * 100)).toFixed(1)}%; {dataPoint.error ? 'background-color: var(--error-color);' : ''}">
+                                            {dataPoint.value.toFixed(0)} ms
+                                        </div>
+                                    {/each}
+                                </div>
+                                <div class="tui-chart-y-axis">
+                                    <div class="tui-chart-legend">{Math.round(maxLatency)}</div>
+                                    <div class="tui-chart-legend">{Math.round(maxLatency * 0.75)}</div>
+                                    <div class="tui-chart-legend">{Math.round(maxLatency * 0.5)}</div>
+                                    <div class="tui-chart-legend">{Math.round(maxLatency * 0.25)}</div>
+                                    <div class="tui-chart-legend">0 ms</div>
+                                </div>
+                                <div class="tui-chart-x-axis">
+                                    {#each chartData as dataPoint}
+                                        <div class="tui-chart-legend">{formatTimeLabel(dataPoint.time)}</div>
+                                    {/each}
+                                </div>
                             </div>
-                            <div class="tui-chart-y-axis">
-                                <div class="tui-chart-legend">{Math.round(maxLatency)}</div>
-                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.75)}</div>
-                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.5)}</div>
-                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.25)}</div>
-                                <div class="tui-chart-legend">0 ms</div>
+                        {:else}
+                            <div class="tui-panel" style="height: 100%;">
+                                <div class="tui-panel-content"
+                                     style="display: flex; justify-content: center; align-items: center; height: 100%;">
+                                    <p>Loading chart data...</p>
+                                </div>
                             </div>
-                            <div class="tui-chart-x-axis">
-                                {#each chartData as dataPoint}
-                                    <div class="tui-chart-legend">{formatTimeLabel(dataPoint.time)}</div>
-                                {/each}
+                        {/if}
+                    </div>
+                {:else}
+                    <!-- Errors view -->
+                    <div class="errors-container">
+                        {#if currentErrors.length > 0}
+                            <div class="tui-table-container" style="height: 350px; overflow-y: auto;">
+                                <table class="tui-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Type</th>
+                                        <th>Response</th>
+                                        <th>Error</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {#each currentErrors as error}
+                                        <tr class={error.errorType}>
+                                            <td>{formatErrorTime(error.timestamp)}</td>
+                                            <td>{error.errorType}</td>
+                                            <td>{error.responseTime.toFixed(0)} ms</td>
+                                            <td>{error.message}</td>
+                                        </tr>
+                                    {/each}
+                                    </tbody>
+                                </table>
                             </div>
-                        </div>
-                    {:else}
-                        <div class="tui-panel" style="height: 100%;">
-                            <div class="tui-panel-content"
-                                 style="display: flex; justify-content: center; align-items: center; height: 100%;">
-                                <p>Loading chart data...</p>
+                        {:else}
+                            <div class="tui-panel" style="height: 350px;">
+                                <div class="tui-panel-content"
+                                     style="display: flex; justify-content: center; align-items: center; height: 100%;">
+                                    <p>No errors recorded for this endpoint in the selected time range.</p>
+                                </div>
                             </div>
-                        </div>
-                    {/if}
-                </div>
+                        {/if}
+                    </div>
+                {/if}
+
                 <!-- Stats row with uptime and avg response time -->
                 <div class="stats-row">
                     <div class="stat-item">
@@ -1002,6 +1173,32 @@
 
     .tui-menu-active {
         background-color: var(--tui-bg-highlighted);
+    }
+
+    /* Tab styling */
+    .tui-tabs {
+        display: flex;
+        margin-bottom: 10px;
+        border-bottom: 1px solid var(--tui-border);
+    }
+
+    .tui-tab {
+        background: transparent;
+        border: none;
+        padding: 8px 16px;
+        margin-right: 4px;
+        cursor: pointer;
+        color: var(--tui-text);
+    }
+
+    .tui-tab-active {
+        border: 1px solid var(--tui-border);
+        border-bottom: none;
+        background-color: red;
+    }
+
+    .errors-container {
+        margin-bottom: 25px;
     }
 
     /* Hide URL column and metrics columns on narrow screens */
