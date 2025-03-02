@@ -1,5 +1,5 @@
 export default [
-  {url: 'https://rpc.hydradx.cloud', name: 'GalacticCouncil'},
+  {url: 'https://rpc.hydradx.cloud', name: 'GC'},
   {url: 'https://hydration-rpc.n.dwellir.com', name: 'Dwellir'},
   {url: 'https://rpc.helikon.io/hydradx', name: 'Helicon'},
   {url: 'https://hydration.dotters.network', name: 'Dotters'},

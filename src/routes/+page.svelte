@@ -482,7 +482,7 @@
                             <td>{result.endpoint.name}</td>
                             <td class="url-column">{result.endpoint.url}</td>
                             <td>{result.blockHeight || 'N/A'}</td>
-                            <td>{result.responseTime.toFixed(2)} ms</td>
+                            <td>{result.responseTime.toFixed(0)} ms</td>
                             <td width="80px">
                                 <div style="display: flex; align-items: center;">
                                     {#if endpointHistory[result.endpoint.url]}
@@ -507,7 +507,7 @@
     <div class="tui-statusbar">
         <ul>
             <li>
-                <span>Data source: {useBackend ? 'Remote' : 'Local'}</span>
+                <span>{useBackend ? 'Remote' : 'Local'}</span>
             </li>
             <span class="tui-statusbar-divider"></span>
             <li>
@@ -539,10 +539,10 @@
                                 {/each}
                             </div>
                             <div class="tui-chart-y-axis">
-                                <div class="tui-chart-legend">{Math.round(maxLatency)} ms</div>
-                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.75)} ms</div>
-                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.5)} ms</div>
-                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.25)} ms</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency)}</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.75)}</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.5)}</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.25)}</div>
                                 <div class="tui-chart-legend">0 ms</div>
                             </div>
                             <div class="tui-chart-x-axis">
