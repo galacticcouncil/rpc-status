@@ -999,7 +999,7 @@
             </div>
         </li>
         <li class="tui-dropdown">
-            <span>RPC Method</span>
+            <span>Check</span>
             <div class="tui-dropdown-content">
                 <ul>
                     {#each rpcMethods as method}
