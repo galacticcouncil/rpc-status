@@ -466,7 +466,7 @@
             <div class="tui-panel-header tui-bg-blue tui-fg-white">Hydration RPC Endpoints Status</div>
             <div class="tui-panel-content" style="padding: 0;">
                 <div class="tui-table-container">
-                    <table class="tui-table hovered-cyan striped-blue">
+                    <table class="tui-table hovered-cyan striped-purple">
                         <thead>
                         <tr>
                             <th>Name</th>
@@ -531,30 +531,30 @@
 
                 <div class="chart-container" style="height: 400px; margin-bottom: 15px;">
                     {#if historyData.length > 0}
-                        <!-- TUI Chart instead of D3 Line Chart -->
+                        <!-- TUI Vertical Chart -->
                         {@const chartData = processHistoryDataForTuiChart(historyData)}
                         {@const maxLatency = getMaxLatency(chartData)}
 
-                        <div class="tui-chart-horizontal" style="width: 100%; height: 350px;">
+                        <div class="tui-chart-vertical" style="width: 100%; height: 350px;">
                             <div class="tui-chart-display">
                                 {#each chartData as dataPoint, i}
                                     <div class="tui-chart-value {dataPoint.error ? 'red-168' : 'green-168'}"
-                                         style="width: {Math.min(100, (dataPoint.value / maxLatency * 100)).toFixed(1)}%;">
+                                         style="height: {Math.min(100, (dataPoint.value / maxLatency * 100)).toFixed(1)}%;">
                                         {dataPoint.value.toFixed(0)} ms
                                     </div>
                                 {/each}
                             </div>
                             <div class="tui-chart-y-axis">
+                                <div class="tui-chart-legend">{Math.round(maxLatency)} ms</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.75)} ms</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.5)} ms</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.25)} ms</div>
+                                <div class="tui-chart-legend">0 ms</div>
+                            </div>
+                            <div class="tui-chart-x-axis">
                                 {#each chartData as dataPoint}
                                     <div class="tui-chart-legend">{formatTimeLabel(dataPoint.time)}</div>
                                 {/each}
-                            </div>
-                            <div class="tui-chart-x-axis">
-                                <div class="tui-chart-legend">0</div>
-                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.25)} ms</div>
-                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.5)} ms</div>
-                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.75)} ms</div>
-                                <div class="tui-chart-legend">{Math.round(maxLatency)} ms</div>
                             </div>
                         </div>
                     {:else}
