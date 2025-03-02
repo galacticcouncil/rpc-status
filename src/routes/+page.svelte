@@ -1,6 +1,5 @@
 <script>
   import {onMount, onDestroy} from 'svelte';
-  import LineChart from '$lib/components/LineChart.svelte';
   import {browser} from '$app/environment';
 
   // RPC monitor imports (loaded only on client-side)
@@ -28,6 +27,7 @@
   let pollCount = 0;
   let showChart = false;
   let showSettings = false;
+  let currentTime = new Date(); // For time display
 
   // Initialize browser monitor
   function initMonitor() {
@@ -38,6 +38,7 @@
     monitor.setUpdateCallback(newResults => {
       results = newResults;
       updateEndpointHistory(newResults);
+      updateTime(); // Update time on data refresh
     });
 
     // Start monitoring based on initial useBackend setting
@@ -47,6 +48,11 @@
     } else {
       monitor.start(CHECK_INTERVAL);
     }
+  }
+
+  // Update current time
+  function updateTime() {
+    currentTime = new Date();
   }
 
   onMount(() => {
@@ -148,6 +154,7 @@
       const data = await response.json();
       results = data;
       updateEndpointHistory(data);
+      updateTime(); // Update time on data refresh
     } catch (error) {
       console.error('Error fetching from backend:', error);
     }
@@ -244,21 +251,38 @@
     });
   }
 
-  // Process data for chart display - smooth and simplify
-  function processChartData(data) {
+  // Process data for TUI chart display
+  function processHistoryDataForTuiChart(data) {
     if (!data || data.length === 0) return [];
 
     // Sort chronologically
     const sortedData = [...data].sort((a, b) => a.time - b.time);
 
-    // If we have lots of data points, reduce them
-    if (sortedData.length > 30) {
-      // Simple sampling - take every nth point
-      const samplingRate = Math.ceil(sortedData.length / 30);
-      return sortedData.filter((_, i) => i % samplingRate === 0);
+    // If we have lots of data points, reduce them for the chart
+    let chartData = sortedData;
+    if (sortedData.length > 8) {
+      // Take at most 8 data points
+      const step = Math.floor(sortedData.length / 8);
+      chartData = [];
+      for (let i = 0; i < sortedData.length; i += step) {
+        if (chartData.length < 8 && i < sortedData.length) {
+          chartData.push(sortedData[i]);
+        }
+      }
     }
 
-    return sortedData;
+    return chartData;
+  }
+
+  // Format time for chart labels
+  function formatTimeLabel(time) {
+    return time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  }
+
+  // Calculate max value for chart scaling
+  function getMaxLatency(data) {
+    if (!data || data.length === 0) return 1000;
+    return Math.max(...data.map(d => d.value), 1000);
   }
 
   // Handle endpoint selection for chart modal
@@ -329,6 +353,9 @@
 
   // Update status history and refresh chart if needed
   function updateEndpointHistory(newResults) {
+    // Update time on data refresh
+    updateTime();
+
     // Update history for each endpoint
     newResults.forEach(result => {
       const url = result.endpoint.url;
@@ -425,7 +452,7 @@
             </div>
         </li>
 
-        <span class="tui-datetime" data-format="h:m:s a">{new Date().toLocaleTimeString()}</span>
+        <span class="tui-datetime" data-format="h:m:s a">{currentTime.toLocaleTimeString()}</span>
     </ul>
 
 </nav>
@@ -439,11 +466,11 @@
             <div class="tui-panel-header tui-bg-blue tui-fg-white">Hydration RPC Endpoints Status</div>
             <div class="tui-panel-content" style="padding: 0;">
                 <div class="tui-table-container">
-                    <table class="tui-table hovered-cyan striped-purple">
+                    <table class="tui-table hovered-cyan striped-blue">
                         <thead>
                         <tr>
                             <th>Name</th>
-                            <th>URL</th>
+                            <th class="url-column">URL</th>
                             <th>Block</th>
                             <th>Latency</th>
                             <th>Status</th>
@@ -456,7 +483,7 @@
                                     style="cursor: pointer;"
                             >
                                 <td>{result.endpoint.name}</td>
-                                <td>{result.endpoint.url}</td>
+                                <td class="url-column">{result.endpoint.url}</td>
                                 <td>{result.blockHeight || 'N/A'}</td>
                                 <td>{result.responseTime.toFixed(2)} ms</td>
                                 <td>
@@ -504,7 +531,32 @@
 
                 <div class="chart-container" style="height: 400px; margin-bottom: 15px;">
                     {#if historyData.length > 0}
-                        <LineChart data={processChartData(historyData)}/>
+                        <!-- TUI Chart instead of D3 Line Chart -->
+                        {@const chartData = processHistoryDataForTuiChart(historyData)}
+                        {@const maxLatency = getMaxLatency(chartData)}
+
+                        <div class="tui-chart-horizontal" style="width: 100%; height: 350px;">
+                            <div class="tui-chart-display">
+                                {#each chartData as dataPoint, i}
+                                    <div class="tui-chart-value {dataPoint.error ? 'red-168' : 'green-168'}"
+                                         style="width: {Math.min(100, (dataPoint.value / maxLatency * 100)).toFixed(1)}%;">
+                                        {dataPoint.value.toFixed(0)} ms
+                                    </div>
+                                {/each}
+                            </div>
+                            <div class="tui-chart-y-axis">
+                                {#each chartData as dataPoint}
+                                    <div class="tui-chart-legend">{formatTimeLabel(dataPoint.time)}</div>
+                                {/each}
+                            </div>
+                            <div class="tui-chart-x-axis">
+                                <div class="tui-chart-legend">0</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.25)} ms</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.5)} ms</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency * 0.75)} ms</div>
+                                <div class="tui-chart-legend">{Math.round(maxLatency)} ms</div>
+                            </div>
+                        </div>
                     {:else}
                         <div class="tui-panel" style="height: 100%;">
                             <div class="tui-panel-content"
@@ -603,5 +655,12 @@
 
     .tui-menu-active {
         background-color: var(--tui-bg-highlighted);
+    }
+
+    /* Hide URL column on narrow screens */
+    @media (max-width: 768px) {
+        .url-column {
+            display: none;
+        }
     }
 </style>
