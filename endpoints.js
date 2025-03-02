@@ -11,6 +11,8 @@ export default [
   {url: 'https://archive.rpc.hydration.cloud', name: 'Archive'},
   {url: 'https://rpc.sin.hydration.cloud', name: 'sin'},
   {url: 'https://rpc.coke.hydration.cloud', name: 'coke'},
+  {url: 'https://rpc.lait.hydration.cloud', name: 'lait'},
+  {url: 'https://rpc.limo.hydration.cloud', name: 'limo'},
   {url: 'https://5.rpc.hydration.cloud', name: '5'},
   {url: 'https://4.rpc.hydration.cloud', name: '4'},
   {url: 'https://7.rpc.hydration.cloud', name: '7'},
