@@ -117,8 +117,9 @@
     if (!browser) return;
 
     try {
+      // Use response time metric instead of block height
       const response = await fetch(
-              `/api/history?endpoint=${encodeURIComponent(endpoint)}&timeRange=${range}`
+              `/api/history?endpoint=${encodeURIComponent(endpoint)}&metric=polkadot_rpc_response_time_ms&timeRange=${range}`
       );
       const data = await response.json();
 
@@ -136,9 +137,26 @@
 
     // Convert Prometheus data format to chart format
     return result[0].values.map(([timestamp, value]) => ({
-      time: new Date(timestamp * 1000).toLocaleTimeString(),
+      time: new Date(timestamp * 1000),
       value: parseFloat(value)
     }));
+  }
+
+  // Process data for chart display - smooth and simplify
+  function processChartData(data) {
+    if (!data || data.length === 0) return [];
+
+    // Sort chronologically
+    const sortedData = [...data].sort((a, b) => a.time - b.time);
+
+    // If we have lots of data points, reduce them
+    if (sortedData.length > 30) {
+      // Simple sampling - take every nth point
+      const samplingRate = Math.ceil(sortedData.length / 30);
+      return sortedData.filter((_, i) => i % samplingRate === 0);
+    }
+
+    return sortedData;
   }
 
   // Handle endpoint selection
@@ -280,9 +298,9 @@
 
   {#if selectedEndpoint}
     <section class="historical-data">
-      <h2>Historical Data</h2>
+      <h2>Historical Latency Data</h2>
       <div class="chart-container">
-        <LineChart data={historyData} />
+        <LineChart data={processChartData(historyData)} />
       </div>
     </section>
   {/if}
