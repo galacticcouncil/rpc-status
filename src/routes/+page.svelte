@@ -1,0 +1,267 @@
+<script>
+  import { onMount, onDestroy } from 'svelte';
+  import LineChart from '$lib/components/LineChart.svelte';
+  import { browser } from '$app/environment';
+
+  // RPC monitor imports (loaded only on client-side)
+  let PolkadotRpcMonitor;
+  if (browser) {
+    // Dynamic import only on browser environment
+    import('../../core-monitor.js').then(module => {
+      PolkadotRpcMonitor = module.PolkadotRpcMonitor;
+      initMonitor();
+    });
+  }
+
+  const CHECK_INTERVAL = 10000; // 10 seconds
+
+  // State variables
+  let results = [];
+  let historyData = [];
+  let selectedEndpoint = null;
+  let timeRange = '1h';
+  let useBackend = true;
+  let monitor;
+  let intervalId;
+
+  // Initialize browser monitor
+  function initMonitor() {
+    if (!browser || !PolkadotRpcMonitor) return;
+
+    monitor = new PolkadotRpcMonitor();
+
+    monitor.setUpdateCallback(newResults => {
+      results = newResults;
+    });
+
+    // Start monitoring based on initial useBackend setting
+    if (useBackend) {
+      fetchResultsFromBackend();
+      startBackendPolling();
+    } else {
+      monitor.start(CHECK_INTERVAL);
+    }
+  }
+
+  onMount(() => {
+    // Monitor is initialized via dynamic import
+    // Fetch initial data from backend regardless
+    if (browser) {
+      fetchResultsFromBackend();
+    }
+  });
+
+  // Clean up on component destroy
+  onDestroy(() => {
+    if (browser) {
+      if (monitor) {
+        monitor.stop();
+      }
+
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    }
+  });
+
+  // Toggle between backend and browser monitoring
+  $: if (browser && monitor) {
+    if (useBackend) {
+      monitor.stop();
+      fetchResultsFromBackend();
+      startBackendPolling();
+    } else {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+      monitor.start(CHECK_INTERVAL);
+    }
+  }
+
+  // Fetch historical data when endpoint or time range changes
+  $: if (browser && selectedEndpoint) {
+    fetchHistoricalData(selectedEndpoint, timeRange);
+  }
+
+  // Fetch results from backend
+  async function fetchResultsFromBackend() {
+    if (!browser) return;
+
+    try {
+      const response = await fetch('/api/status');
+      const data = await response.json();
+      results = data;
+    } catch (error) {
+      console.error('Error fetching from backend:', error);
+    }
+  }
+
+  // Start polling backend for updates
+  function startBackendPolling() {
+    if (!browser) return;
+
+    if (intervalId) {
+      clearInterval(intervalId);
+    }
+
+    intervalId = setInterval(fetchResultsFromBackend, CHECK_INTERVAL);
+  }
+
+  // Fetch historical data for a specific endpoint
+  async function fetchHistoricalData(endpoint, range) {
+    if (!browser) return;
+
+    try {
+      const response = await fetch(
+        `/api/history?endpoint=${encodeURIComponent(endpoint)}&timeRange=${range}`
+      );
+      const data = await response.json();
+
+      if (data.data && data.data.result) {
+        historyData = processHistoricalData(data.data.result);
+      }
+    } catch (error) {
+      console.error('Error fetching historical data:', error);
+    }
+  }
+
+  // Process Prometheus data format to chart format
+  function processHistoricalData(result) {
+    if (!result || !result.length) return [];
+
+    // Convert Prometheus data format to chart format
+    return result[0].values.map(([timestamp, value]) => ({
+      time: new Date(timestamp * 1000).toLocaleTimeString(),
+      value: parseFloat(value)
+    }));
+  }
+
+  // Handle endpoint selection
+  function handleEndpointSelect(endpoint) {
+    selectedEndpoint = endpoint.url;
+  }
+</script>
+
+<svelte:head>
+  <title>Hydration RPC Monitor</title>
+</svelte:head>
+
+<main>
+  <header>
+    <h1>Hydration RPC Monitor</h1>
+    <div class="controls">
+      {#if browser}
+        <label>
+          <input
+            type="checkbox"
+            bind:checked={useBackend}
+          />
+          Use Backend Data Source
+        </label>
+      {/if}
+
+      <select bind:value={timeRange}>
+        <option value="15m">Last 15 minutes</option>
+        <option value="1h">Last hour</option>
+        <option value="3h">Last 3 hours</option>
+        <option value="12h">Last 12 hours</option>
+        <option value="24h">Last 24 hours</option>
+      </select>
+    </div>
+  </header>
+
+  <section class="current-status">
+    <h2>RPC Endpoints Status</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>URL</th>
+          <th>Block Height</th>
+          <th>Response Time</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each results as result, index (index)}
+          <tr
+            class={result.status === 'success' ? 'success' : 'error'}
+            on:click={() => handleEndpointSelect(result.endpoint)}
+          >
+            <td>{result.endpoint.name}</td>
+            <td>{result.endpoint.url}</td>
+            <td>{result.blockHeight || 'N/A'}</td>
+            <td>{result.responseTime.toFixed(2)} ms</td>
+            <td>{result.status}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </section>
+
+  {#if selectedEndpoint}
+    <section class="historical-data">
+      <h2>Historical Data</h2>
+      <div class="chart-container">
+        <LineChart data={historyData} />
+      </div>
+    </section>
+  {/if}
+</main>
+
+<style>
+  main {
+    font-family: sans-serif;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+  }
+
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
+
+  th {
+    background-color: #f2f2f2;
+  }
+
+  tr:hover {
+    background-color: #f5f5f5;
+    cursor: pointer;
+  }
+
+  tr.success td {
+    background-color: rgba(0, 128, 0, 0.1);
+  }
+
+  tr.error td {
+    background-color: rgba(255, 0, 0, 0.1);
+  }
+
+  .chart-container {
+    height: 300px;
+    width: 100%;
+  }
+</style>

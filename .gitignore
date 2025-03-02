@@ -1,0 +1,60 @@
+# Node dependencies
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Build output
+/build/
+/dist/
+.svelte-kit/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# SvelteKit
+.svelte-kit
+build
+.DS_Store
+
+# Vite
+vite.config.js.timestamp-*
+vitepress-cache
+
+# Docker
+.docker/
+
+# Prometheus
+prometheus_data/
+
+# IDE and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+*.sublime-*
+.history/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Testing
+/coverage
+.nyc_output
+
+# Project specific
+prometheus.local.yml
+
+# OS specific
+.DS_Store
+Thumbs.db
