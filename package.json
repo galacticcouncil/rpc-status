@@ -8,11 +8,11 @@
     "build": "vite build",
     "start": "NODE_ENV=production node backend/server.js",
     "test": "jest",
-    "docker:build": "docker build -t rpc-status .",
-    "docker:run": "docker run -p 3000:3000 rpc-status",
+    "docker:build": "docker build -t galacticcouncil/rpc-status .",
+    "docker:run": "docker run -p 3000:3000 galacticcouncil/rpc-status",
     "docker:compose": "docker-compose up",
     "docker:prometheus": "./start-prometheus.sh",
-    "deploy:swarm": "docker stack deploy -c docker-stack.yml rpc-status"
+    "docker:deploy": "docker push galacticcouncil/rpc-status"
   },
   "keywords": [
     "polkadot",
