@@ -64,7 +64,6 @@
         button.addEventListener('click', () => {
           const modalId = button.getAttribute('data-modal');
           document.getElementById(modalId).style.display = 'block';
-          document.querySelector('.tui-overlap').style.display = 'block';
         });
       });
 
@@ -72,16 +71,7 @@
         button.addEventListener('click', () => {
           const modalId = button.getAttribute('data-modal');
           document.getElementById(modalId).style.display = 'none';
-          document.querySelector('.tui-overlap').style.display = 'none';
         });
-      });
-
-      // Close modal when clicking on overlap (outside the modal)
-      document.querySelector('.tui-overlap').addEventListener('click', () => {
-        document.querySelectorAll('.tui-modal').forEach(modal => {
-          modal.style.display = 'none';
-        });
-        document.querySelector('.tui-overlap').style.display = 'none';
       });
     }
   });
@@ -276,7 +266,7 @@
 
   // Format time for chart labels
   function formatTimeLabel(time) {
-    return time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    return time.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   }
 
   // Calculate max value for chart scaling
@@ -294,7 +284,6 @@
     if (browser) {
       // Open the modal
       document.getElementById('chart-modal').style.display = 'block';
-      document.querySelector('.tui-overlap').style.display = 'block';
 
       // Fetch data
       fetchHistoricalData(endpoint.url, timeRange);
@@ -305,7 +294,6 @@
   function closeChartModal() {
     if (browser) {
       document.getElementById('chart-modal').style.display = 'none';
-      document.querySelector('.tui-overlap').style.display = 'none';
     }
   }
 
@@ -403,10 +391,12 @@
 </script>
 
 <svelte:head>
-    <title>Hydration RPC Monitor</title>
+    <title>Hydration RPC Status</title>
 </svelte:head>
 
+
 <nav class="tui-nav">
+    <div class="tui-panel-header tui-bg-blue tui-fg-white">Hydration RPC Status</div>
     <ul>
         <li class="tui-dropdown">
             <span>Data Source</span>
@@ -414,7 +404,7 @@
                 <ul>
                     <li>
                         <span on:click={toggleBackend}>
-                          {useBackend ? '[x] Backend' : '[ ] Backend'}
+                          {useBackend ? '[x] Remote' : '[ ] Remote'}
                         </span>
                     </li>
                     <div class="tui-black-divider"></div>
@@ -460,50 +450,47 @@
 <main class="tui-bg-blue-black">
 
     <!-- Content -->
-    <div class="tui-window-content" style="padding: 5px;">
-        <!-- RPC status table -->
-        <div class="tui-panel rpc-panel" style="width: 100%;">
-            <div class="tui-panel-header tui-bg-blue tui-fg-white">Hydration RPC Endpoints Status</div>
-            <div class="tui-panel-content" style="padding: 0;">
-                <div class="tui-table-container">
-                    <table class="tui-table hovered-cyan striped-purple">
-                        <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th class="url-column">URL</th>
-                            <th>Block</th>
-                            <th>Latency</th>
-                            <th>Status</th>
+    <!-- RPC status table -->
+    <div class="tui-panel" style="width: 100%; margin-top: 50px">
+        <div class="tui-panel-content" style="padding: 0;">
+            <div class="tui-table-container">
+                <table class="tui-table hovered-cyan striped-purple">
+                    <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th class="url-column">URL</th>
+                        <th>Block</th>
+                        <th>Latency</th>
+                        <th>Status</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {#each results as result, index (index)}
+                        <tr
+                                on:click={() => handleEndpointSelect(result.endpoint)}
+                                style="cursor: pointer;"
+                        >
+                            <td>{result.endpoint.name}</td>
+                            <td class="url-column">{result.endpoint.url}</td>
+                            <td>{result.blockHeight || 'N/A'}</td>
+                            <td>{result.responseTime.toFixed(2)} ms</td>
+                            <td width="80px">
+                                <div style="display: flex; align-items: center;">
+                                    {#if endpointHistory[result.endpoint.url]}
+                                        {#each endpointHistory[result.endpoint.url] as status}
+                                            <span class={`status-icon ${status}`} title={status}></span>
+                                        {/each}
+                                    {:else}
+                                        {#each Array(7).fill('unknown') as _}
+                                            <span class="status-icon unknown" title="No data yet"></span>
+                                        {/each}
+                                    {/if}
+                                </div>
+                            </td>
                         </tr>
-                        </thead>
-                        <tbody>
-                        {#each results as result, index (index)}
-                            <tr
-                                    on:click={() => handleEndpointSelect(result.endpoint)}
-                                    style="cursor: pointer;"
-                            >
-                                <td>{result.endpoint.name}</td>
-                                <td class="url-column">{result.endpoint.url}</td>
-                                <td>{result.blockHeight || 'N/A'}</td>
-                                <td>{result.responseTime.toFixed(2)} ms</td>
-                                <td>
-                                    <div style="display: flex; align-items: center;">
-                                        {#if endpointHistory[result.endpoint.url]}
-                                            {#each endpointHistory[result.endpoint.url] as status}
-                                                <span class={`status-icon ${status}`} title={status}></span>
-                                            {/each}
-                                        {:else}
-                                            {#each Array(7).fill('unknown') as _}
-                                                <span class="status-icon unknown" title="No data yet"></span>
-                                            {/each}
-                                        {/if}
-                                    </div>
-                                </td>
-                            </tr>
-                        {/each}
-                        </tbody>
-                    </table>
-                </div>
+                    {/each}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -511,7 +498,7 @@
     <div class="tui-statusbar">
         <ul>
             <li>
-                <span>Data source: {useBackend ? 'Backend' : 'Local'}</span>
+                <span>Data source: {useBackend ? 'Remote' : 'Local'}</span>
             </li>
             <span class="tui-statusbar-divider"></span>
             <li>
@@ -520,16 +507,14 @@
         </ul>
     </div>
 
-    <!-- Overlap for modal -->
-    <div class="tui-overlap"></div>
-
     <!-- Chart Modal window -->
     <div id="chart-modal" class="tui-modal">
-        <div class="tui-window modal-centered" style="width: 80%; max-width: 900px; height: auto; max-height: 80%;">
+        <div class="tui-window modal-centered cyan-168" style="width: 80%; max-width: 900px; height: auto; max-height: 80%;">
             <fieldset class="tui-fieldset">
-                <legend class="tui-bg-blue tui-fg-white">Historical Latency Data: {selectedEndpointName}</legend>
+                <legend class="">{selectedEndpointName}</legend>
+                <button on:click={closeChartModal} class="tui-fieldset-button right"><span>■</span></button>
 
-                <div class="chart-container" style="height: 400px; margin-bottom: 15px;">
+                <div style="margin-bottom: 25px;">
                     {#if historyData.length > 0}
                         <!-- TUI Vertical Chart -->
                         {@const chartData = processHistoryDataForTuiChart(historyData)}
@@ -539,7 +524,7 @@
                             <div class="tui-chart-display">
                                 {#each chartData as dataPoint, i}
                                     <div class="tui-chart-value {dataPoint.error ? 'red-168' : 'green-168'}"
-                                         style="height: {Math.min(100, (dataPoint.value / maxLatency * 100)).toFixed(1)}%;">
+                                         style="height: {Math.min(100, (dataPoint.value / maxLatency * 100)).toFixed(1)}%; {dataPoint.error ? 'background-color: var(--error-color);' : ''}">
                                         {dataPoint.value.toFixed(0)} ms
                                     </div>
                                 {/each}
@@ -566,17 +551,8 @@
                         </div>
                     {/if}
                 </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <span>Endpoint: {selectedEndpoint}</span>
-                    </div>
-                    <div>
-                        <button class="tui-button tui-modal-close-button" on:click={closeChartModal}
-                                data-modal="chart-modal">
-                            Close
-                        </button>
-                    </div>
+                <div>
+                    <span>Endpoint: {selectedEndpoint}</span>
                 </div>
             </fieldset>
         </div>
@@ -624,12 +600,12 @@
     .status-icon {
         display: inline-block;
         width: 8px;
-        height: 8px;
+        height: 14px;
         margin-right: 3px;
     }
 
     /* Modal initial state */
-    .tui-modal, .tui-overlap {
+    .tui-modal {
         display: none;
     }
 
@@ -640,13 +616,6 @@
         left: 50%;
         transform: translate(-50%, -50%);
     }
-
-    /* Chart container */
-    .chart-container {
-        width: 100%;
-        min-height: 400px;
-    }
-
     /* Custom TUI Menu styles */
     .tui-menu-btn {
         cursor: pointer;
@@ -658,7 +627,7 @@
     }
 
     /* Hide URL column on narrow screens */
-    @media (max-width: 768px) {
+    @media (max-width: 1000px) {
         .url-column {
             display: none;
         }

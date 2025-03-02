@@ -3,10 +3,10 @@
 
 /* Custom styles for the app */
 :root {
-    --success-color: #00ff00;
-    --warning-color: #ffff00;
-    --error-color: #ff0000;
-    --timeout-color: #ff00ff;
+    --success-color: #00FF00;
+    --warning-color: #FFaa00;
+    --error-color: #FF0000;
+    --timeout-color: #FF0000;
 }
 
 body {
