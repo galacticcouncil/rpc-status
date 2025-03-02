@@ -34,6 +34,7 @@
   let showSettings = false;
   let currentTime = new Date(); // For time display
   let lastSaveTime = 0; // To limit save frequency
+  let endpointMetrics = {}; // Store calculated metrics for each endpoint
 
   // Load data from localStorage
   function loadLocalData() {
@@ -71,6 +72,9 @@
         endpointHistory = JSON.parse(savedHistory);
         console.log('Loaded endpoint history from localStorage');
       }
+
+      // Calculate metrics after loading data
+      calculateEndpointMetrics();
     } catch (error) {
       console.error('Error loading data from localStorage:', error);
       // If data is corrupted, reset it
@@ -125,6 +129,137 @@
     console.log('Pruned old data to reduce storage size');
   }
 
+  // Calculate metrics for all endpoints
+  function calculateEndpointMetrics() {
+    const now = new Date().getTime();
+    const timeWindow = parseTimeRange(timeRange); // Use current time range instead of hardcoded 24h
+
+    // Initialize metrics object
+    endpointMetrics = {};
+
+    // Calculate for all endpoints with history data
+    Object.keys(localHistoryData).forEach(endpoint => {
+      if (Array.isArray(localHistoryData[endpoint])) {
+        // Get recent data within time window
+        const recentData = localHistoryData[endpoint].filter(item =>
+          (now - item.time.getTime()) <= timeWindow
+        );
+
+        if (recentData.length > 0) {
+          // Calculate uptime (percentage of non-error responses)
+          const upCount = recentData.filter(item => !item.error).length;
+          const uptime = upCount / recentData.length * 100;
+
+          // Calculate average latency (for successful responses only)
+          const successLatencies = recentData.filter(item => !item.error).map(item => item.value);
+          const avgLatency = successLatencies.length > 0
+            ? successLatencies.reduce((sum, val) => sum + val, 0) / successLatencies.length
+            : null;
+
+          endpointMetrics[endpoint] = {
+            avgLatency: avgLatency !== null ? avgLatency : Infinity,
+            uptime: uptime,
+            dataPoints: recentData.length,
+            remote: false // Flag as local source
+          };
+        }
+      }
+    });
+  }
+
+  // Export local data as JSON file
+  function exportLocalData() {
+    if (!browser) return;
+
+    // Prepare export data object
+    const exportData = {
+      timestamp: new Date().toISOString(),
+      version: '1.0',
+      historyData: localHistoryData,
+      endpointHistory: endpointHistory
+    };
+
+    // Convert to JSON string
+    const jsonString = JSON.stringify(exportData, null, 2);
+
+    // Create blob and download link
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    // Create temporary link and trigger download
+    const a = document.createElement('a');
+    const fileName = `rpc-monitor-data-${new Date().toISOString().slice(0,10)}.json`;
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+
+    // Clean up
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  }
+
+  // Import local data from JSON file
+  async function importLocalData() {
+    if (!browser) return;
+
+    // Create file input element
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+
+    // Handle file selection
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const importedData = JSON.parse(text);
+
+        // Validate imported data structure
+        if (!importedData.historyData || !importedData.endpointHistory) {
+          throw new Error('Invalid data format');
+        }
+
+        // Process imported history data to restore Date objects
+        Object.keys(importedData.historyData).forEach(endpoint => {
+          if (Array.isArray(importedData.historyData[endpoint])) {
+            importedData.historyData[endpoint] = importedData.historyData[endpoint].map(item => ({
+              ...item,
+              time: new Date(item.time)
+            }));
+          }
+        });
+
+        // Merge with existing data
+        localHistoryData = { ...localHistoryData, ...importedData.historyData };
+        endpointHistory = { ...endpointHistory, ...importedData.endpointHistory };
+
+        // Save merged data
+        saveLocalData();
+
+        // Recalculate metrics
+        calculateEndpointMetrics();
+
+        // Refresh UI if showing chart
+        if (showChart && selectedEndpoint) {
+          fetchHistoricalData(selectedEndpoint, timeRange);
+        }
+
+        alert("Data imported successfully");
+      } catch (error) {
+        console.error('Error importing data:', error);
+        alert("Error importing data: " + error.message);
+      }
+    };
+
+    // Trigger file selection
+    input.click();
+  }
+
   // Initialize browser monitor
   function initMonitor() {
     if (!browser || !PolkadotRpcMonitor) return;
@@ -137,6 +272,14 @@
     monitor.setUpdateCallback(newResults => {
       results = newResults;
       updateEndpointHistory(newResults);
+
+      // Update metrics based on data source
+      if (useBackend) {
+        fetchMetricsFromBackend();
+      } else {
+        calculateEndpointMetrics();
+      }
+
       updateTime(); // Update time on data refresh
     });
 
@@ -203,9 +346,13 @@
   // Toggle between backend and browser monitoring - only when useBackend actually changes
   $: if (browser && monitor && (oldUseBackend !== useBackend)) {
     oldUseBackend = useBackend;
+
+    // Clear metrics when toggling to ensure we don't mix data sources
+    endpointMetrics = {};
+
     if (useBackend) {
       monitor.stop();
-      fetchResultsFromBackend();
+      fetchResultsFromBackend(); // This will fetch metrics from backend
       startBackendPolling();
     } else {
       if (intervalId) {
@@ -213,6 +360,8 @@
         intervalId = null;
       }
       monitor.start(CHECK_INTERVAL);
+      // When switching to local, recalculate metrics from local data
+      calculateEndpointMetrics();
     }
 
     // Refresh chart data if chart is visible
@@ -232,6 +381,13 @@
 
     if (showChart && selectedEndpoint) {
       fetchHistoricalData(selectedEndpoint, timeRange);
+    }
+
+    // Recalculate metrics when time range changes
+    if (useBackend) {
+      fetchMetricsFromBackend();
+    } else {
+      calculateEndpointMetrics();
     }
   }
 
@@ -257,6 +413,7 @@
       const data = await response.json();
       results = data;
       updateEndpointHistory(data);
+      calculateEndpointMetrics(); // Update metrics after getting new data
       updateTime(); // Update time on data refresh
     } catch (error) {
       console.error('Error fetching from backend:', error);
@@ -531,6 +688,7 @@
     // Clear memory variables
     localHistoryData = {};
     endpointHistory = {};
+    endpointMetrics = {};
 
     // Update UI to reflect cleared data
     if (showChart && selectedEndpoint) {
@@ -539,6 +697,20 @@
 
     console.log('Local data cleared');
   }
+
+  // Sort results by average latency
+  $: sortedResults = [...results].sort((a, b) => {
+    const aMetrics = endpointMetrics[a.endpoint.url];
+    const bMetrics = endpointMetrics[b.endpoint.url];
+
+    // Sort by average latency - lowest first
+    // If no metrics available, put these at the end
+    if (!aMetrics && !bMetrics) return 0;
+    if (!aMetrics) return 1;
+    if (!bMetrics) return -1;
+
+    return aMetrics.avgLatency - bMetrics.avgLatency;
+  });
 </script>
 
 <svelte:head>
@@ -549,7 +721,7 @@
     <div class="tui-panel-header tui-bg-blue tui-fg-white">Hydration RPC Status</div>
     <ul>
         <li class="tui-dropdown">
-            <span>Data Source</span>
+            <span>Data</span>
             <div class="tui-dropdown-content">
                 <ul>
                     <li>
@@ -558,6 +730,28 @@
                         </span>
                     </li>
                     <div class="tui-black-divider"></div>
+                    <li>
+                        <span on:click={exportLocalData}>
+                          Export Data
+                        </span>
+                    </li>
+                    <li>
+                        <span on:click={importLocalData}>
+                          Import Data
+                        </span>
+                    </li>
+                    <li>
+                        <span on:click={clearLocalData}>
+                          Clear Local
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </li>
+        <li class="tui-dropdown">
+            <span>Time range</span>
+            <div class="tui-dropdown-content">
+                <ul>
                     <li>
                         <span class="tui-menu-item" class:tui-menu-active={timeRange === '15m'}
                               on:click={() => selectTimeRange('15m')}>
@@ -588,12 +782,6 @@
                           Last 24 hours
                         </span>
                     </li>
-                    <div class="tui-black-divider"></div>
-                    <li>
-                        <span on:click={clearLocalData}>
-                          Clear Local
-                        </span>
-                    </li>
                 </ul>
             </div>
         </li>
@@ -617,11 +805,13 @@
                         <th class="url-column">URL</th>
                         <th>Block</th>
                         <th>Latency</th>
+                        <th class="metrics-column">Average</th>
+                        <th class="metrics-column">Uptime</th>
                         <th>Status</th>
                     </tr>
                     </thead>
                     <tbody>
-                    {#each results as result, index (index)}
+                    {#each sortedResults as result, index (index)}
                         <tr
                                 on:click={() => handleEndpointSelect(result.endpoint)}
                                 style="cursor: pointer;"
@@ -630,6 +820,20 @@
                             <td class="url-column">{result.endpoint.url}</td>
                             <td>{result.blockHeight || 'N/A'}</td>
                             <td>{result.responseTime.toFixed(0)} ms</td>
+                            <td class="metrics-column">
+                                {#if endpointMetrics[result.endpoint.url]?.avgLatency !== undefined && endpointMetrics[result.endpoint.url]?.avgLatency !== Infinity}
+                                    {endpointMetrics[result.endpoint.url].avgLatency.toFixed(0)} ms
+                                {:else}
+                                    N/A
+                                {/if}
+                            </td>
+                            <td class="metrics-column">
+                                {#if endpointMetrics[result.endpoint.url]?.uptime !== undefined}
+                                    {endpointMetrics[result.endpoint.url].uptime.toFixed(1)}%
+                                {:else}
+                                    N/A
+                                {/if}
+                            </td>
                             <td width="80px">
                                 <div style="display: flex; align-items: center;">
                                     {#if endpointHistory[result.endpoint.url]}
@@ -658,7 +862,7 @@
             </li>
             <span class="tui-statusbar-divider"></span>
             <li on:click={toggleRange}>
-                <span>Time range: {timeRange}</span>
+                <span>{timeRange}</span>
             </li>
         </ul>
     </div>
@@ -800,9 +1004,13 @@
         background-color: var(--tui-bg-highlighted);
     }
 
-    /* Hide URL column on narrow screens */
+    /* Hide URL column and metrics columns on narrow screens */
     @media (max-width: 768px) {
         .url-column {
+            display: none;
+        }
+
+        .metrics-column {
             display: none;
         }
     }
