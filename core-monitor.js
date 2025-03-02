@@ -46,11 +46,11 @@ class PolkadotRpcMonitor {
         signal: controller.signal
       });
 
-      clearTimeout(timeoutId);
-      const endTime = performance.now();
-      const responseTime = endTime - startTime;
-
       if (!response.ok) {
+        clearTimeout(timeoutId);
+        const endTime = performance.now();
+        const responseTime = endTime - startTime;
+
         return {
           endpoint,
           status: 'error',
@@ -64,6 +64,10 @@ class PolkadotRpcMonitor {
       const data = await response.json();
 
       if (data.error) {
+        clearTimeout(timeoutId);
+        const endTime = performance.now();
+        const responseTime = endTime - startTime;
+
         return {
           endpoint,
           status: 'error',
@@ -74,14 +78,83 @@ class PolkadotRpcMonitor {
         };
       }
 
-      // Parse response based on method
+      // Handle different methods and extract block height
       let blockHeight;
-      if (method === 'chain_getBlock') {
+      let secondCallData;
+
+      if (method === 'chain_getFinalizedHead') {
+        // Extract the block hash from the first response
+        const blockHash = data.result;
+
+        // Make a second call to get the block details using the hash
+        const secondResponse = await fetch(endpoint.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'chain_getBlock',
+            params: [blockHash]
+          }),
+          signal: controller.signal
+        });
+
+        if (!secondResponse.ok) {
+          clearTimeout(timeoutId);
+          const endTime = performance.now();
+          const responseTime = endTime - startTime;
+
+          return {
+            endpoint,
+            status: 'error',
+            error: `HTTP error ${secondResponse.status} on second call`,
+            details: secondResponse,
+            responseTime,
+            method: rpcMethod
+          };
+        }
+
+        secondCallData = await secondResponse.json();
+
+        if (secondCallData.error) {
+          clearTimeout(timeoutId);
+          const endTime = performance.now();
+          const responseTime = endTime - startTime;
+
+          return {
+            endpoint,
+            status: 'error',
+            error: `Second call error: ${secondCallData.error.message || JSON.stringify(secondCallData.error)}`,
+            details: secondCallData,
+            responseTime,
+            method: rpcMethod
+          };
+        }
+
+        // Parse the block number from the second response
+        blockHeight = parseInt(secondCallData.result.block.header.number, 16);
+      }
+      // For eth_blockNumber, parse the hex value
+      else if (method === 'eth_blockNumber') {
+        blockHeight = parseInt(data.result, 16);
+      }
+      else if (method === 'system_syncState') {
+        blockHeight = data.result.currentBlock;
+      }
+      // For chain_getBlock, parse as before
+      else if (method === 'chain_getBlock') {
         blockHeight = parseInt(data.result.block.header.number, 16);
-      } else {
-        // For other methods, we may not have block height
+      }
+      // For other methods, we may not have block height
+      else {
         blockHeight = undefined;
       }
+
+      clearTimeout(timeoutId);
+      const endTime = performance.now();
+      const responseTime = endTime - startTime;
 
       return {
         endpoint,
@@ -89,7 +162,18 @@ class PolkadotRpcMonitor {
         blockHeight,
         responseTime,
         timestamp: new Date().toISOString(),
-        method: rpcMethod
+        method: rpcMethod,
+        ...(method === 'system_syncState' && {
+          syncStatus: data?.result
+        }),
+        ...(method === 'chain_getBlock' && {
+          blockDetails: data?.result
+        }),
+        // Include additional data for chain_getFinalizedHead
+        ...(method === 'chain_getFinalizedHead' && {
+          finalizedHash: data.result,
+          blockDetails: secondCallData?.result
+        })
       };
     } catch (error) {
       clearTimeout(timeoutId);

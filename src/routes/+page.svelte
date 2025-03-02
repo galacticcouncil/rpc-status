@@ -21,9 +21,9 @@
   // Available RPC methods
   let rpcMethods = [
     { id: 'chain_getBlock', name: 'chain_getBlock', description: 'Get latest block' },
-    { id: 'system_health', name: 'system_health', description: 'Check node health' },
+    { id: 'eth_blockNumber', name: 'eth_blockNumber', description: 'Get latest block number through EVM' },
     { id: 'chain_getFinalizedHead', name: 'chain_getFinalizedHead', description: 'Get finalized head' },
-    { id: 'system_syncState', name: 'system_syncState', description: 'Check sync state' }
+    { id: 'system_syncState', name: 'system_syncState', description: 'Check sync state' },
   ];
   let selectedMethod = 'chain_getBlock';
 
