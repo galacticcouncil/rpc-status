@@ -12,11 +12,20 @@
   }
 
   const CHECK_INTERVAL = 10000; // 10 seconds
-  const LOCAL_STORAGE_KEY = 'hydration-rpc-monitor-data';
-  const LOCAL_STORAGE_ENDPOINT_HISTORY_KEY = 'hydration-rpc-endpoint-history';
-  const LOCAL_STORAGE_ENDPOINT_ERRORS_KEY = 'hydration-rpc-endpoint-errors';
+  const LOCAL_STORAGE_KEY = 'hydration-rpc-monitor-data-by-method';
+  const LOCAL_STORAGE_ENDPOINT_HISTORY_KEY = 'hydration-rpc-endpoint-history-by-method';
+  const LOCAL_STORAGE_ENDPOINT_ERRORS_KEY = 'hydration-rpc-endpoint-errors-by-method';
   const MAX_STORAGE_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
   const MAX_ERROR_ENTRIES = 500; // Maximum number of error entries to store per endpoint
+
+  // Available RPC methods
+  let rpcMethods = [
+    { id: 'chain_getBlock', name: 'chain_getBlock', description: 'Get latest block' },
+    { id: 'system_health', name: 'system_health', description: 'Check node health' },
+    { id: 'chain_getFinalizedHead', name: 'chain_getFinalizedHead', description: 'Get finalized head' },
+    { id: 'system_syncState', name: 'system_syncState', description: 'Check sync state' }
+  ];
+  let selectedMethod = 'chain_getBlock';
 
   // State variables
   let results = [];
@@ -29,9 +38,9 @@
   let monitor;
   let intervalId;
   let timeIntervalId; // For time updates
-  let endpointHistory = {};
-  let endpointErrors = {}; // New: Store error details for each endpoint
-  let localHistoryData = {};
+  let endpointHistory = {}; // Organized by method, then endpoint
+  let endpointErrors = {}; // Organized by method, then endpoint
+  let localHistoryData = {}; // Organized by method, then endpoint
   let showChart = false;
   let showErrors = false; // New: Toggle for error display
   let currentTime = new Date(); // For time display
@@ -48,20 +57,27 @@
       if (savedData) {
         const parsedData = JSON.parse(savedData);
 
-        // Convert string dates back to Date objects
-        Object.keys(parsedData).forEach(endpoint => {
-          if (Array.isArray(parsedData[endpoint])) {
-            parsedData[endpoint] = parsedData[endpoint].map(item => ({
-              ...item,
-              time: new Date(item.time)
-            }));
+        // Initialize structure if needed
+        if (!parsedData[selectedMethod]) {
+          parsedData[selectedMethod] = {};
+        }
 
-            // Filter out data older than MAX_STORAGE_AGE_MS
-            const cutoffTime = new Date().getTime() - MAX_STORAGE_AGE_MS;
-            parsedData[endpoint] = parsedData[endpoint].filter(item =>
-              item.time.getTime() >= cutoffTime
-            );
-          }
+        // Convert string dates back to Date objects for all methods
+        Object.keys(parsedData).forEach(method => {
+          Object.keys(parsedData[method]).forEach(endpoint => {
+            if (Array.isArray(parsedData[method][endpoint])) {
+              parsedData[method][endpoint] = parsedData[method][endpoint].map(item => ({
+                ...item,
+                time: new Date(item.time)
+              }));
+
+              // Filter out data older than MAX_STORAGE_AGE_MS
+              const cutoffTime = new Date().getTime() - MAX_STORAGE_AGE_MS;
+              parsedData[method][endpoint] = parsedData[method][endpoint].filter(item =>
+                item.time.getTime() >= cutoffTime
+              );
+            }
+          });
         });
 
         localHistoryData = parsedData;
@@ -72,28 +88,41 @@
       const savedHistory = localStorage.getItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY);
       if (savedHistory) {
         endpointHistory = JSON.parse(savedHistory);
+
+        // Initialize structure if needed
+        if (!endpointHistory[selectedMethod]) {
+          endpointHistory[selectedMethod] = {};
+        }
+
         console.log('Loaded endpoint history from localStorage');
       }
 
-      // Load endpoint errors (new)
+      // Load endpoint errors
       const savedErrors = localStorage.getItem(LOCAL_STORAGE_ENDPOINT_ERRORS_KEY);
       if (savedErrors) {
         const parsedErrors = JSON.parse(savedErrors);
 
-        // Convert string dates back to Date objects
-        Object.keys(parsedErrors).forEach(endpoint => {
-          if (Array.isArray(parsedErrors[endpoint])) {
-            parsedErrors[endpoint] = parsedErrors[endpoint].map(item => ({
-              ...item,
-              timestamp: new Date(item.timestamp)
-            }));
+        // Initialize structure if needed
+        if (!parsedErrors[selectedMethod]) {
+          parsedErrors[selectedMethod] = {};
+        }
 
-            // Filter out errors older than MAX_STORAGE_AGE_MS
-            const cutoffTime = new Date().getTime() - MAX_STORAGE_AGE_MS;
-            parsedErrors[endpoint] = parsedErrors[endpoint].filter(item =>
-              item.timestamp.getTime() >= cutoffTime
-            );
-          }
+        // Convert string dates back to Date objects for all methods
+        Object.keys(parsedErrors).forEach(method => {
+          Object.keys(parsedErrors[method]).forEach(endpoint => {
+            if (Array.isArray(parsedErrors[method][endpoint])) {
+              parsedErrors[method][endpoint] = parsedErrors[method][endpoint].map(item => ({
+                ...item,
+                timestamp: new Date(item.timestamp)
+              }));
+
+              // Filter out errors older than MAX_STORAGE_AGE_MS
+              const cutoffTime = new Date().getTime() - MAX_STORAGE_AGE_MS;
+              parsedErrors[method][endpoint] = parsedErrors[method][endpoint].filter(item =>
+                item.timestamp.getTime() >= cutoffTime
+              );
+            }
+          });
         });
 
         endpointErrors = parsedErrors;
@@ -105,9 +134,9 @@
     } catch (error) {
       console.error('Error loading data from localStorage:', error);
       // If data is corrupted, reset it
-      localHistoryData = {};
-      endpointHistory = {};
-      endpointErrors = {}; // Reset errors too
+      localHistoryData = { [selectedMethod]: {} };
+      endpointHistory = { [selectedMethod]: {} };
+      endpointErrors = { [selectedMethod]: {} };
     }
   }
 
@@ -123,7 +152,7 @@
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localHistoryData));
       localStorage.setItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY, JSON.stringify(endpointHistory));
-      localStorage.setItem(LOCAL_STORAGE_ENDPOINT_ERRORS_KEY, JSON.stringify(endpointErrors)); // Save errors
+      localStorage.setItem(LOCAL_STORAGE_ENDPOINT_ERRORS_KEY, JSON.stringify(endpointErrors));
     } catch (error) {
       console.error('Error saving to localStorage:', error);
 
@@ -148,21 +177,25 @@
     const reducedAgeMs = MAX_STORAGE_AGE_MS / 2;
     const cutoffTime = new Date().getTime() - reducedAgeMs;
 
-    Object.keys(localHistoryData).forEach(endpoint => {
-      if (Array.isArray(localHistoryData[endpoint])) {
-        localHistoryData[endpoint] = localHistoryData[endpoint].filter(item =>
-          item.time.getTime() >= cutoffTime
-        );
-      }
+    Object.keys(localHistoryData).forEach(method => {
+      Object.keys(localHistoryData[method]).forEach(endpoint => {
+        if (Array.isArray(localHistoryData[method][endpoint])) {
+          localHistoryData[method][endpoint] = localHistoryData[method][endpoint].filter(item =>
+            item.time.getTime() >= cutoffTime
+          );
+        }
+      });
     });
 
     // Also prune error data
-    Object.keys(endpointErrors).forEach(endpoint => {
-      if (Array.isArray(endpointErrors[endpoint])) {
-        endpointErrors[endpoint] = endpointErrors[endpoint].filter(item =>
-          item.timestamp.getTime() >= cutoffTime
-        );
-      }
+    Object.keys(endpointErrors).forEach(method => {
+      Object.keys(endpointErrors[method]).forEach(endpoint => {
+        if (Array.isArray(endpointErrors[method][endpoint])) {
+          endpointErrors[method][endpoint] = endpointErrors[method][endpoint].filter(item =>
+            item.timestamp.getTime() >= cutoffTime
+          );
+        }
+      });
     });
 
     console.log('Pruned old data to reduce storage size');
@@ -171,16 +204,21 @@
   // Calculate metrics for all endpoints
   function calculateEndpointMetrics() {
     const now = new Date().getTime();
-    const timeWindow = parseTimeRange(timeRange); // Use current time range instead of hardcoded 24h
+    const timeWindow = parseTimeRange(timeRange);
 
     // Initialize metrics object
     endpointMetrics = {};
 
-    // Calculate for all endpoints with history data
-    Object.keys(localHistoryData).forEach(endpoint => {
-      if (Array.isArray(localHistoryData[endpoint])) {
+    // Make sure we have structure for current method
+    if (!localHistoryData[selectedMethod]) {
+      return;
+    }
+
+    // Calculate for all endpoints with history data for current method
+    Object.keys(localHistoryData[selectedMethod]).forEach(endpoint => {
+      if (Array.isArray(localHistoryData[selectedMethod][endpoint])) {
         // Get recent data within time window
-        const recentData = localHistoryData[endpoint].filter(item =>
+        const recentData = localHistoryData[selectedMethod][endpoint].filter(item =>
           (now - item.time.getTime()) <= timeWindow
         );
 
@@ -205,6 +243,32 @@
         }
       }
     });
+  }
+
+  // Change RPC method
+  function changeRpcMethod(method) {
+    // Only allow changing method when using local data source
+    if (useBackend) {
+      useBackend = false; // Force switch to local mode
+    }
+
+    selectedMethod = method;
+
+    // Update the monitor with the new method
+    if (browser && monitor) {
+      monitor.setMethod(method);
+
+      // Reset displayed history data to show method-specific data
+      historyData = [];
+
+      // Recalculate metrics for the selected method
+      calculateEndpointMetrics();
+
+      // If chart is visible, refresh it with method-specific data
+      if (showChart && selectedEndpoint) {
+        fetchHistoricalData(selectedEndpoint, timeRange);
+      }
+    }
   }
 
   // Export local data as JSON file
@@ -266,24 +330,32 @@
         }
 
         // Process imported history data to restore Date objects
-        Object.keys(importedData.historyData).forEach(endpoint => {
-          if (Array.isArray(importedData.historyData[endpoint])) {
-            importedData.historyData[endpoint] = importedData.historyData[endpoint].map(item => ({
-              ...item,
-              time: new Date(item.time)
-            }));
-          }
+        Object.keys(importedData.historyData).forEach(method => {
+          if (!importedData.historyData[method]) return;
+
+          Object.keys(importedData.historyData[method]).forEach(endpoint => {
+            if (Array.isArray(importedData.historyData[method][endpoint])) {
+              importedData.historyData[method][endpoint] = importedData.historyData[method][endpoint].map(item => ({
+                ...item,
+                time: new Date(item.time)
+              }));
+            }
+          });
         });
 
         // Process imported error data if it exists
         if (importedData.endpointErrors) {
-          Object.keys(importedData.endpointErrors).forEach(endpoint => {
-            if (Array.isArray(importedData.endpointErrors[endpoint])) {
-              importedData.endpointErrors[endpoint] = importedData.endpointErrors[endpoint].map(item => ({
-                ...item,
-                timestamp: new Date(item.timestamp)
-              }));
-            }
+          Object.keys(importedData.endpointErrors).forEach(method => {
+            if (!importedData.endpointErrors[method]) return;
+
+            Object.keys(importedData.endpointErrors[method]).forEach(endpoint => {
+              if (Array.isArray(importedData.endpointErrors[method][endpoint])) {
+                importedData.endpointErrors[method][endpoint] = importedData.endpointErrors[method][endpoint].map(item => ({
+                  ...item,
+                  timestamp: new Date(item.timestamp)
+                }));
+              }
+            });
           });
         }
 
@@ -342,7 +414,7 @@
       fetchResultsFromBackend();
       startBackendPolling();
     } else {
-      monitor.start(CHECK_INTERVAL);
+      monitor.start(CHECK_INTERVAL, selectedMethod);
     }
   }
 
@@ -408,12 +480,16 @@
       monitor.stop();
       fetchResultsFromBackend(); // This will fetch metrics from backend
       startBackendPolling();
+      // Reset method to default when using backend
+      if (selectedMethod !== 'chain_getBlock') {
+        selectedMethod = 'chain_getBlock';
+      }
     } else {
       if (intervalId) {
         clearInterval(intervalId);
         intervalId = null;
       }
-      monitor.start(CHECK_INTERVAL);
+      monitor.start(CHECK_INTERVAL, selectedMethod);
       // When switching to local, recalculate metrics from local data
       calculateEndpointMetrics();
     }
@@ -461,6 +537,11 @@
   // Toggle backend use and close menu
   function toggleBackend() {
     useBackend = !useBackend;
+
+    // If switching to backend, reset method to default
+    if (useBackend && selectedMethod !== 'chain_getBlock') {
+      selectedMethod = 'chain_getBlock';
+    }
   }
 
   // Fetch results from backend
@@ -516,12 +597,12 @@
         console.error('Error fetching historical data:', error);
       }
     } else {
-      // Use local history data when not using backend
-      if (localHistoryData[endpoint]) {
+      // Use method-specific local history data
+      if (localHistoryData[selectedMethod] && localHistoryData[selectedMethod][endpoint]) {
         // Filter data based on time range
         const now = new Date();
         const rangeInMs = parseTimeRange(range);
-        historyData = localHistoryData[endpoint].filter(d =>
+        historyData = localHistoryData[selectedMethod][endpoint].filter(d =>
           (now - d.time) <= rangeInMs
         );
       } else {
@@ -614,10 +695,10 @@
       document.getElementById('chart-modal').style.display = 'block';
 
       // Use the existing local history data without triggering a reactive update
-      if (localHistoryData[endpoint.url]) {
+      if (localHistoryData[selectedMethod] && localHistoryData[selectedMethod][endpoint.url]) {
         const now = new Date();
         const rangeInMs = parseTimeRange(timeRange);
-        historyData = localHistoryData[endpoint.url].filter(d =>
+        historyData = localHistoryData[selectedMethod][endpoint.url].filter(d =>
           (now - d.time) <= rangeInMs
         );
       } else {
@@ -680,30 +761,43 @@
     // Update time on data refresh
     updateTime();
 
+    // Ensure we have structures for the current method
+    if (!localHistoryData[selectedMethod]) {
+      localHistoryData[selectedMethod] = {};
+    }
+
+    if (!endpointHistory[selectedMethod]) {
+      endpointHistory[selectedMethod] = {};
+    }
+
+    if (!endpointErrors[selectedMethod]) {
+      endpointErrors[selectedMethod] = {};
+    }
+
     // Update history for each endpoint
     newResults.forEach(result => {
       const url = result.endpoint.url;
       const status = categorizeStatus(result);
 
-      // Initialize history array if needed
-      if (!endpointHistory[url]) {
+      // Initialize history array if needed for this method+endpoint
+      if (!endpointHistory[selectedMethod][url]) {
         // Initialize with 7 "unknown" statuses
-        endpointHistory[url] = Array(7).fill("unknown");
+        endpointHistory[selectedMethod][url] = Array(7).fill("unknown");
       }
 
-      // Shift existing statuses to the left (newest always at the end/right)
-      const newHistory = [...endpointHistory[url]];
+      // Shift existing statuses for this method+endpoint
+      const newHistory = [...endpointHistory[selectedMethod][url]];
       newHistory.shift(); // Remove the oldest (leftmost) status
       newHistory.push(status); // Add new status at the end (right)
-      endpointHistory[url] = newHistory;
+      endpointHistory[selectedMethod][url] = newHistory;
 
       // Update local history data for charts
-      if (!localHistoryData[url]) {
-        localHistoryData[url] = [];
+      if (!localHistoryData[selectedMethod][url]) {
+        localHistoryData[selectedMethod][url] = [];
       }
 
       // Add new data point with current timestamp
-      localHistoryData[url].push({
+      localHistoryData[selectedMethod][url].push({
         time: new Date(),
         value: result.responseTime,
         error: result.status !== 'success' || result.timeout
@@ -711,18 +805,18 @@
 
       // Limit local history size (keep ~24 hours at 10s intervals = ~8640 points)
       const maxPoints = 8640;
-      if (localHistoryData[url].length > maxPoints) {
-        localHistoryData[url] = localHistoryData[url].slice(-maxPoints);
+      if (localHistoryData[selectedMethod][url].length > maxPoints) {
+        localHistoryData[selectedMethod][url] = localHistoryData[selectedMethod][url].slice(-maxPoints);
       }
 
       // Update error history if there's an error
       if (result.status !== 'success' || result.timeout) {
-        if (!endpointErrors[url]) {
-          endpointErrors[url] = [];
+        if (!endpointErrors[selectedMethod][url]) {
+          endpointErrors[selectedMethod][url] = [];
         }
 
         // Add error details
-        endpointErrors[url].push({
+        endpointErrors[selectedMethod][url].push({
           timestamp: new Date(),
           errorType: result.timeout ? 'timeout' : 'error',
           message: result.error || 'Unknown error',
@@ -733,8 +827,8 @@
         console.log('error', result)
 
         // Limit error history size
-        if (endpointErrors[url].length > MAX_ERROR_ENTRIES) {
-          endpointErrors[url] = endpointErrors[url].slice(-MAX_ERROR_ENTRIES);
+        if (endpointErrors[selectedMethod][url].length > MAX_ERROR_ENTRIES) {
+          endpointErrors[selectedMethod][url] = endpointErrors[selectedMethod][url].slice(-MAX_ERROR_ENTRIES);
         }
       }
     });
@@ -769,9 +863,9 @@
     localStorage.removeItem(LOCAL_STORAGE_ENDPOINT_ERRORS_KEY);
 
     // Clear memory variables
-    localHistoryData = {};
-    endpointHistory = {};
-    endpointErrors = {};
+    localHistoryData = { [selectedMethod]: {} };
+    endpointHistory = { [selectedMethod]: {} };
+    endpointErrors = { [selectedMethod]: {} };
     endpointMetrics = {};
 
     // Update UI to reflect cleared data
@@ -784,20 +878,21 @@
 
   // Get recent errors for the selected endpoint
   function getRecentErrors(endpoint, timeWindow = null) {
-    if (!endpointErrors[endpoint] || !Array.isArray(endpointErrors[endpoint])) {
+    if (!endpointErrors[selectedMethod] || !endpointErrors[selectedMethod][endpoint] ||
+      !Array.isArray(endpointErrors[selectedMethod][endpoint])) {
       return [];
     }
 
     // If timeWindow is specified, filter by time
     if (timeWindow) {
       const now = new Date().getTime();
-      return endpointErrors[endpoint]
+      return endpointErrors[selectedMethod][endpoint]
         .filter(error => (now - error.timestamp.getTime()) <= timeWindow)
         .sort((a, b) => b.timestamp - a.timestamp); // Sort newest first
     }
 
     // Otherwise return all errors, newest first
-    return [...endpointErrors[endpoint]].sort((a, b) => b.timestamp - a.timestamp);
+    return [...endpointErrors[selectedMethod][endpoint]].sort((a, b) => b.timestamp - a.timestamp);
   }
 
   // Format error timestamp
@@ -903,6 +998,21 @@
                 </ul>
             </div>
         </li>
+        <li class="tui-dropdown">
+            <span>RPC Method</span>
+            <div class="tui-dropdown-content">
+                <ul>
+                    {#each rpcMethods as method}
+                        <li>
+                            <span class="tui-menu-item" class:tui-menu-active={selectedMethod === method.id}
+                                  on:click={() => changeRpcMethod(method.id)}>
+                                {method.name}
+                            </span>
+                        </li>
+                    {/each}
+                </ul>
+            </div>
+        </li>
 
         <span class="tui-datetime" data-format="h:m:s a">{currentTime.toLocaleTimeString()}</span>
     </ul>
@@ -961,8 +1071,8 @@
                             {/if}
                             <td width="80px">
                                 <div style="display: flex; align-items: center;">
-                                    {#if endpointHistory[result.endpoint.url]}
-                                        {#each endpointHistory[result.endpoint.url] as status}
+                                    {#if endpointHistory[selectedMethod] && endpointHistory[selectedMethod][result.endpoint.url]}
+                                        {#each endpointHistory[selectedMethod][result.endpoint.url] as status}
                                             <span class={`status-icon ${status}`} title={status}></span>
                                         {/each}
                                     {:else}
@@ -989,6 +1099,10 @@
             <li on:click={toggleRange}>
                 <span>{timeRange}</span>
             </li>
+            <span class="tui-statusbar-divider"></span>
+            <li>
+                <span>{selectedMethod}</span>
+            </li>
         </ul>
     </div>
 
@@ -1000,12 +1114,12 @@
                 <button on:click={closeChartModal} class="tui-fieldset-button right"><span>■</span></button>
 
                 <!-- Tab buttons -->
-<!--                <div class="tui-tabs">-->
-<!--                    <ul>-->
-<!--                        <li><a class="tui-tab" class:tui-tab-active={!showErrors} on:click={() => showErrors = false}>Chart</a></li>-->
-<!--                        <li><a class="tui-tab" class:tui-tab-active={showErrors} on:click={() => showErrors = true}>Errors ({errorCount})</a></li>-->
-<!--                    </ul>-->
-<!--                </div>-->
+                <!--                <div class="tui-tabs">-->
+                <!--                    <ul>-->
+                <!--                        <li><a class="tui-tab" class:tui-tab-active={!showErrors} on:click={() => showErrors = false}>Chart</a></li>-->
+                <!--                        <li><a class="tui-tab" class:tui-tab-active={showErrors} on:click={() => showErrors = true}>Errors ({errorCount})</a></li>-->
+                <!--                    </ul>-->
+                <!--                </div>-->
 
                 {#if !showErrors}
                     <!-- Chart view -->

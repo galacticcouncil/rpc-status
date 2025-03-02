@@ -6,6 +6,7 @@ class PolkadotRpcMonitor {
     this.results = [];
     this.interval = null;
     this.onUpdate = null;
+    this.currentMethod = 'chain_getBlock'; // Default RPC method
   }
 
   addRpcEndpoint(url, name = '') {
@@ -21,10 +22,14 @@ class PolkadotRpcMonitor {
     return this;
   }
 
-  async checkBlockHeight(endpoint, timeoutMs = 5000) {
+  async checkBlockHeight(endpoint, timeoutMs = 5000, method = 'chain_getBlock') {
     const startTime = performance.now();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    // Define request parameters based on method
+    let rpcMethod = method;
+    let params = [];
 
     try {
       const response = await fetch(endpoint.url, {
@@ -35,8 +40,8 @@ class PolkadotRpcMonitor {
         body: JSON.stringify({
           jsonrpc: '2.0',
           id: 1,
-          method: 'chain_getBlock',
-          params: []
+          method: rpcMethod,
+          params: params
         }),
         signal: controller.signal
       });
@@ -51,7 +56,8 @@ class PolkadotRpcMonitor {
           status: 'error',
           error: `HTTP error ${response.status}`,
           details: response,
-          responseTime
+          responseTime,
+          method: rpcMethod
         };
       }
 
@@ -63,19 +69,27 @@ class PolkadotRpcMonitor {
           status: 'error',
           error: data.error.message || JSON.stringify(data.error),
           details: data,
-          responseTime
+          responseTime,
+          method: rpcMethod
         };
       }
 
-      // Parse block height (Polkadot returns hex)
-      const blockHeight = parseInt(data.result.block.header.number, 16);
+      // Parse response based on method
+      let blockHeight;
+      if (method === 'chain_getBlock') {
+        blockHeight = parseInt(data.result.block.header.number, 16);
+      } else {
+        // For other methods, we may not have block height
+        blockHeight = undefined;
+      }
 
       return {
         endpoint,
         status: 'success',
         blockHeight,
         responseTime,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        method: rpcMethod
       };
     } catch (error) {
       clearTimeout(timeoutId);
@@ -88,7 +102,8 @@ class PolkadotRpcMonitor {
           status: 'error',
           error: `Request timed out after ${timeoutMs}ms`,
           responseTime: timeoutMs,
-          timeout: true
+          timeout: true,
+          method: rpcMethod
         };
       }
 
@@ -97,14 +112,18 @@ class PolkadotRpcMonitor {
         status: 'error',
         error: error.message || String(error),
         details: error,
-        responseTime: endTime - startTime
+        responseTime: endTime - startTime,
+        method: rpcMethod
       };
     }
   }
 
-  async checkAllEndpoints() {
+  async checkAllEndpoints(method = null) {
+    // Use provided method or fall back to current method
+    const rpcMethod = method || this.currentMethod;
+
     const results = await Promise.all(
-      this.rpcEndpoints.map(endpoint => this.checkBlockHeight(endpoint))
+      this.rpcEndpoints.map(endpoint => this.checkBlockHeight(endpoint, 5000, rpcMethod))
     );
 
     // Sort by block height (descending) and then by response time (ascending)
@@ -133,10 +152,13 @@ class PolkadotRpcMonitor {
     return this.results;
   }
 
-  start(intervalMs = 10000) {
+  start(intervalMs = 10000, method = 'chain_getBlock') {
     if (this.interval) {
       this.stop();
     }
+
+    // Update current method
+    this.currentMethod = method;
 
     // Run immediately
     this.checkAllEndpoints();
@@ -159,6 +181,21 @@ class PolkadotRpcMonitor {
 
   getLatestResults() {
     return this.results;
+  }
+
+  // Set new method and restart monitoring
+  setMethod(method) {
+    if (this.currentMethod !== method) {
+      this.currentMethod = method;
+
+      // If monitoring is active, restart it with the new method
+      if (this.interval) {
+        const wasRunning = true;
+        this.stop();
+        this.start(10000, method);
+      }
+    }
+    return this;
   }
 }
 
