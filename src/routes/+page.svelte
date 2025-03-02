@@ -20,7 +20,7 @@
   let historyData = [];
   let selectedEndpoint = null;
   let timeRange = '1h';
-  let useBackend = true;
+  let useBackend = false;
   let monitor;
   let intervalId;
 
