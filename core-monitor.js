@@ -21,8 +21,10 @@ class PolkadotRpcMonitor {
     return this;
   }
 
-  async checkBlockHeight(endpoint) {
+  async checkBlockHeight(endpoint, timeoutMs = 5000) {
     const startTime = performance.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const response = await fetch(endpoint.url, {
@@ -35,9 +37,11 @@ class PolkadotRpcMonitor {
           id: 1,
           method: 'chain_getBlock',
           params: []
-        })
+        }),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
       const endTime = performance.now();
       const responseTime = endTime - startTime;
 
@@ -72,7 +76,20 @@ class PolkadotRpcMonitor {
         timestamp: new Date().toISOString()
       };
     } catch (error) {
+      clearTimeout(timeoutId);
       const endTime = performance.now();
+
+      // Check if it was a timeout error
+      if (error.name === 'AbortError') {
+        return {
+          endpoint,
+          status: 'error',
+          error: `Request timed out after ${timeoutMs}ms`,
+          responseTime: timeoutMs,
+          timeout: true
+        };
+      }
+
       return {
         endpoint,
         status: 'error',

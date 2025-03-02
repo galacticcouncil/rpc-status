@@ -19,12 +19,14 @@
   let results = [];
   let historyData = [];
   let selectedEndpoint = null;
+  let selectedEndpointName = null;
   let timeRange = '1h';
   let useBackend = false;
   let monitor;
   let intervalId;
   let endpointHistory = {};  // Store status history for each endpoint
   let pollCount = 0;  // Count polls to determine when to update history
+  let showChart = false;
 
   // Initialize browser monitor
   function initMonitor() {
@@ -85,6 +87,7 @@
   // Fetch historical data when endpoint or time range changes
   $: if (browser && selectedEndpoint) {
     fetchHistoricalData(selectedEndpoint, timeRange);
+    showChart = true;
   }
 
   // Fetch results from backend
@@ -183,6 +186,15 @@
   // Handle endpoint selection
   function handleEndpointSelect(endpoint) {
     selectedEndpoint = endpoint.url;
+    selectedEndpointName = endpoint.name;
+    showChart = true;
+  }
+
+  // Handle closing the chart
+  function closeChart() {
+    showChart = false;
+    selectedEndpoint = null;
+    selectedEndpointName = null;
   }
 
   // Calculate maximum block height
@@ -197,6 +209,11 @@
 
   // Helper function to categorize status
   function categorizeStatus(result) {
+    // If the endpoint timed out
+    if (result.timeout) {
+      return 'timeout';
+    }
+
     // If the endpoint is down or has an error
     if (result.status !== 'success') {
       return 'error';
@@ -222,7 +239,7 @@
     return categorizeStatus(result);
   }
 
-  // Update status history
+  // Update status history and refresh chart if needed
   function updateEndpointHistory(newResults) {
     // Update on every poll for more immediate feedback
 
@@ -246,6 +263,11 @@
 
     // Force Svelte to detect the change
     endpointHistory = {...endpointHistory};
+
+    // Refresh chart data if we're currently viewing a chart
+    if (showChart && selectedEndpoint) {
+      fetchHistoricalData(selectedEndpoint, timeRange);
+    }
   }
 </script>
 
@@ -276,6 +298,18 @@
       </select>
     </div>
   </header>
+
+  {#if showChart && selectedEndpoint}
+    <section class="historical-data">
+      <div class="section-header">
+        <h2>Historical Latency Data for {selectedEndpointName} ({selectedEndpoint})</h2>
+        <button class="close-button" on:click={closeChart}>×</button>
+      </div>
+      <div class="chart-container">
+        <LineChart data={processChartData(historyData)} />
+      </div>
+    </section>
+  {/if}
 
   <section class="current-status">
     <h2>RPC Endpoints Status</h2>
@@ -316,15 +350,6 @@
       </tbody>
     </table>
   </section>
-
-  {#if selectedEndpoint}
-    <section class="historical-data">
-      <h2>Historical Latency Data</h2>
-      <div class="chart-container">
-        <LineChart data={processChartData(historyData)} />
-      </div>
-    </section>
-  {/if}
 </main>
 
 <style>
@@ -381,9 +406,46 @@
     background-color: rgba(255, 191, 0, 0.2);
   }
 
+  tr.timeout td {
+    background-color: rgba(128, 0, 128, 0.1); /* Purple-ish for timeouts */
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .close-button {
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-button:hover {
+    background: #d32f2f;
+  }
+
   .chart-container {
     height: 300px;
     width: 100%;
+    margin-bottom: 30px;
+  }
+
+  .historical-data {
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    background-color: #fff;
   }
 
   /* Status history icons styling */
@@ -411,6 +473,10 @@
 
   .status-icon.error {
     background-color: #e74c3c;
+  }
+
+  .status-icon.timeout {
+    background-color: #9b59b6; /* Purple for timeout */
   }
 
   .status-icon.unknown {
