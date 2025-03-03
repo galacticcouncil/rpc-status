@@ -45,7 +45,7 @@ registry.registerMetric(rpcStatus);
 // Configuration
 const config = {
   prometheusUrl: process.env.PROMETHEUS_URL || 'http://prometheus:9090',
-  checkInterval: parseInt(process.env.CHECK_INTERVAL, 10) || 10000,
+  checkInterval: parseInt(process.env.CHECK_INTERVAL, 10) || 5000,
   port: parseInt(process.env.PORT, 10) || 3000,
 };
 

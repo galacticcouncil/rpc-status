@@ -235,7 +235,7 @@ class PolkadotRpcMonitor {
     return this.results;
   }
 
-  start(intervalMs = 10000, method = 'chain_getBlock') {
+  start(intervalMs = 5000, method = 'chain_getBlock') {
     if (this.interval) {
       this.stop();
     }
@@ -275,7 +275,7 @@ class PolkadotRpcMonitor {
       if (this.interval) {
         const wasRunning = true;
         this.stop();
-        this.start(10000, method);
+        this.start(5000, method);
       }
     }
     return this;

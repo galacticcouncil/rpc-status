@@ -4,7 +4,7 @@ import { rpcStore, maxBlockHeight } from '../stores/rpcStore';
 import { parseTimeRange, categorizeStatus, processHistoricalData } from '../utils/helpers';
 
 // Constants
-const CHECK_INTERVAL = 10000; // 10 seconds
+const CHECK_INTERVAL = 5000;
 const LOCAL_STORAGE_KEY = 'hydration-rpc-monitor-data-by-method';
 const LOCAL_STORAGE_ENDPOINT_HISTORY_KEY = 'hydration-rpc-endpoint-history-by-method';
 const LOCAL_STORAGE_ENDPOINT_ERRORS_KEY = 'hydration-rpc-endpoint-errors-by-method';
