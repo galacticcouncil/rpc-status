@@ -32,6 +32,11 @@
   >
     <fieldset class="tui-fieldset">
       <legend class="">{$rpcStore.selectedEndpointName}</legend>
+      <legend class="tui-fieldset-text left"
+        >{$rpcStore.selectedEndpoint
+          ? $rpcStore.selectedEndpoint.replace('https://', '')
+          : ''}</legend
+      >
       <button on:click={closeChartModal} class="tui-fieldset-button right"><span>■</span></button>
 
       <!--            &lt;!&ndash; Tab buttons &ndash;&gt;-->
@@ -51,55 +56,55 @@
       {/if}
 
       <!-- Stats row with uptime and avg response time -->
-      <div class="stat-item">
-        <span class="stat-label">Avg Response:</span>
-        <span class="stat-value">
-          {#if $rpcStore.historyData.filter((d) => !d.error).length > 0}
-            {(
-              $rpcStore.historyData.filter((d) => !d.error).reduce((sum, d) => sum + d.value, 0) /
-              $rpcStore.historyData.filter((d) => !d.error).length
-            ).toFixed(2)}
-            ms
-          {:else}
-            ?
-          {/if}
-        </span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label">Uptime:</span>
-        <span class="stat-value">
-          {#if $rpcStore.historyData.length > 0}
-            {(
-              100 -
-              ($rpcStore.historyData.filter((d) => d.error).length / $rpcStore.historyData.length) *
-                100
-            ).toFixed(2)}
-            %
-          {:else}
-            ?
-          {/if}
-        </span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label">Requests:</span>
-        <span class="stat-value">
-          {#if $rpcStore.historyData.length > 0}
-            {$rpcStore.historyData.length}
-          {:else}
-            ?
-          {/if}
-        </span>
-        <span class="stat-label">Errors:</span>
-        <span class="stat-value">
-          {#if $rpcStore.historyData.length > 0}
-            {$rpcStore.historyData.filter((d) => d.error).length}
-          {:else}
-            ?
-          {/if}
-        </span>
-      </div>
-      <div>
-        <span>Endpoint: {$rpcStore.selectedEndpoint}</span>
+      <div class="stats">
+        <div class="stat-item">
+          <span class="stat-label">Avg Response:</span>
+          <span class="stat-value">
+            {#if $rpcStore.historyData.filter((d) => !d.error).length > 0}
+              {(
+                $rpcStore.historyData.filter((d) => !d.error).reduce((sum, d) => sum + d.value, 0) /
+                $rpcStore.historyData.filter((d) => !d.error).length
+              ).toFixed(2)}
+              ms
+            {:else}
+              ?
+            {/if}
+          </span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Uptime:</span>
+          <span class="stat-value">
+            {#if $rpcStore.historyData.length > 0}
+              {(
+                100 -
+                ($rpcStore.historyData.filter((d) => d.error).length /
+                  $rpcStore.historyData.length) *
+                  100
+              ).toFixed(2)}
+              %
+            {:else}
+              ?
+            {/if}
+          </span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Requests:</span>
+          <span class="stat-value">
+            {#if $rpcStore.historyData.length > 0}
+              {$rpcStore.historyData.length}
+            {:else}
+              ?
+            {/if}
+          </span>
+          <span class="stat-label">Errors:</span>
+          <span class="stat-value">
+            {#if $rpcStore.historyData.length > 0}
+              {$rpcStore.historyData.filter((d) => d.error).length}
+            {:else}
+              ?
+            {/if}
+          </span>
+        </div>
       </div>
     </fieldset>
   </div>
@@ -161,5 +166,9 @@
   .stat-value {
     margin-right: 15px;
     font-weight: bold;
+  }
+
+  .stats {
+    margin-bottom: 15px;
   }
 </style>
