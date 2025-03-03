@@ -1,14 +1,6 @@
 {
-  "watch": [
-    "backend/**/*.js",
-    "core-monitor.js",
-    "src/**/*.{svelte,js,ts,css}",
-    "endpoints.js"
-  ],
-  "ignore": [
-    "build/**/*",
-    "node_modules/**/*"
-  ],
+  "watch": ["backend/**/*.js", "core-monitor.js", "src/**/*.{svelte,js,ts,css}", "endpoints.js"],
+  "ignore": ["build/**/*", "node_modules/**/*"],
   "ext": "js,json,svelte,ts,css",
   "exec": "npm run build && node backend/server.js"
 }

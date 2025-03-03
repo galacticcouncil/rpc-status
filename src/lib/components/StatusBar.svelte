@@ -29,17 +29,17 @@
 </script>
 
 <div class="tui-statusbar">
-    <ul>
-        <li on:click={toggleBackend}>
-            <span>{$rpcStore.useBackend ? 'Remote' : 'Local'}</span>
-        </li>
-        <span class="tui-statusbar-divider"></span>
-        <li on:click={toggleRange}>
-            <span>{$rpcStore.timeRange}</span>
-        </li>
-        <span class="tui-statusbar-divider"></span>
-        <li>
-            <span>{$rpcStore.selectedMethod}</span>
-        </li>
-    </ul>
+  <ul>
+    <li on:click={toggleBackend}>
+      <span>{$rpcStore.useBackend ? 'Remote' : 'Local'}</span>
+    </li>
+    <span class="tui-statusbar-divider"></span>
+    <li on:click={toggleRange}>
+      <span>{$rpcStore.timeRange}</span>
+    </li>
+    <span class="tui-statusbar-divider"></span>
+    <li>
+      <span>{$rpcStore.selectedMethod}</span>
+    </li>
+  </ul>
 </div>

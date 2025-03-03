@@ -10,7 +10,7 @@ class PolkadotRpcMonitor {
   }
 
   addRpcEndpoint(url, name = '') {
-    const endpoint = {url, name: name || url};
+    const endpoint = { url, name: name || url };
     this.rpcEndpoints.push(endpoint);
     return this;
   }
@@ -35,15 +35,15 @@ class PolkadotRpcMonitor {
       const response = await fetch(endpoint.url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           jsonrpc: '2.0',
           id: 1,
           method: rpcMethod,
-          params: params
+          params: params,
         }),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -57,7 +57,7 @@ class PolkadotRpcMonitor {
           error: `HTTP error ${response.status}`,
           details: response,
           responseTime,
-          method: rpcMethod
+          method: rpcMethod,
         };
       }
 
@@ -74,7 +74,7 @@ class PolkadotRpcMonitor {
           error: data.error.message || JSON.stringify(data.error),
           details: data,
           responseTime,
-          method: rpcMethod
+          method: rpcMethod,
         };
       }
 
@@ -90,15 +90,15 @@ class PolkadotRpcMonitor {
         const secondResponse = await fetch(endpoint.url, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
             id: 2,
             method: 'chain_getBlock',
-            params: [blockHash]
+            params: [blockHash],
           }),
-          signal: controller.signal
+          signal: controller.signal,
         });
 
         if (!secondResponse.ok) {
@@ -112,7 +112,7 @@ class PolkadotRpcMonitor {
             error: `HTTP error ${secondResponse.status} on second call`,
             details: secondResponse,
             responseTime,
-            method: rpcMethod
+            method: rpcMethod,
           };
         }
 
@@ -129,7 +129,7 @@ class PolkadotRpcMonitor {
             error: `Second call error: ${secondCallData.error.message || JSON.stringify(secondCallData.error)}`,
             details: secondCallData,
             responseTime,
-            method: rpcMethod
+            method: rpcMethod,
           };
         }
 
@@ -139,8 +139,7 @@ class PolkadotRpcMonitor {
       // For eth_blockNumber, parse the hex value
       else if (method === 'eth_blockNumber') {
         blockHeight = parseInt(data.result, 16);
-      }
-      else if (method === 'system_syncState') {
+      } else if (method === 'system_syncState') {
         blockHeight = data.result.currentBlock;
       }
       // For chain_getBlock, parse as before
@@ -164,16 +163,16 @@ class PolkadotRpcMonitor {
         timestamp: new Date().toISOString(),
         method: rpcMethod,
         ...(method === 'system_syncState' && {
-          syncStatus: data?.result
+          syncStatus: data?.result,
         }),
         ...(method === 'chain_getBlock' && {
-          blockDetails: data?.result
+          blockDetails: data?.result,
         }),
         // Include additional data for chain_getFinalizedHead
         ...(method === 'chain_getFinalizedHead' && {
           finalizedHash: data.result,
-          blockDetails: secondCallData?.result
-        })
+          blockDetails: secondCallData?.result,
+        }),
       };
     } catch (error) {
       clearTimeout(timeoutId);
@@ -187,7 +186,7 @@ class PolkadotRpcMonitor {
           error: `Request timed out after ${timeoutMs}ms`,
           responseTime: timeoutMs,
           timeout: true,
-          method: rpcMethod
+          method: rpcMethod,
         };
       }
 
@@ -197,7 +196,7 @@ class PolkadotRpcMonitor {
         error: error.message || String(error),
         details: error,
         responseTime: endTime - startTime,
-        method: rpcMethod
+        method: rpcMethod,
       };
     }
   }
@@ -207,7 +206,7 @@ class PolkadotRpcMonitor {
     const rpcMethod = method || this.currentMethod;
 
     const results = await Promise.all(
-      this.rpcEndpoints.map(endpoint => this.checkBlockHeight(endpoint, 5000, rpcMethod))
+      this.rpcEndpoints.map((endpoint) => this.checkBlockHeight(endpoint, 5000, rpcMethod))
     );
 
     // Sort by block height (descending) and then by response time (ascending)
@@ -220,7 +219,7 @@ class PolkadotRpcMonitor {
       } else if (a.blockHeight !== undefined) {
         return -1; // a has height, b doesn't, a comes first
       } else if (b.blockHeight !== undefined) {
-        return 1;  // b has height, a doesn't, b comes first
+        return 1; // b has height, a doesn't, b comes first
       }
 
       // Second priority: sort by response time
@@ -284,7 +283,7 @@ class PolkadotRpcMonitor {
 }
 
 // ES Module exports
-export {PolkadotRpcMonitor};
+export { PolkadotRpcMonitor };
 
 // Support for browser global when not using modules
 if (typeof window !== 'undefined') {

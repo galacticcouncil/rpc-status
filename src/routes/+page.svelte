@@ -30,26 +30,26 @@
 </script>
 
 <svelte:head>
-    <title>Hydration RPC Status</title>
+  <title>Hydration RPC Status</title>
 </svelte:head>
 
 <NavBar />
 
 <main class="tui-bg-blue-black">
-    <!-- RPC status table -->
-    <RpcTable />
+  <!-- RPC status table -->
+  <RpcTable />
 
-    <!-- Chart Modal -->
-    <ChartModal />
+  <!-- Chart Modal -->
+  <ChartModal />
 
-    <!-- Status bar -->
-    <StatusBar />
+  <!-- Status bar -->
+  <StatusBar />
 </main>
 
 <style>
-    main {
-        height: 100vh;
-        padding: 20px;
-        overflow: auto;
-    }
+  main {
+    height: 100vh;
+    padding: 20px;
+    overflow: auto;
+  }
 </style>

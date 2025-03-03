@@ -23,19 +23,19 @@ client.collectDefaultMetrics({ register: registry });
 const rpcBlockHeight = new client.Gauge({
   name: 'polkadot_rpc_block_height',
   help: 'Block height reported by Polkadot RPC endpoint',
-  labelNames: ['endpoint', 'name']
+  labelNames: ['endpoint', 'name'],
 });
 
 const rpcResponseTime = new client.Gauge({
   name: 'polkadot_rpc_response_time_ms',
   help: 'Response time in milliseconds for Polkadot RPC endpoint',
-  labelNames: ['endpoint', 'name']
+  labelNames: ['endpoint', 'name'],
 });
 
 const rpcStatus = new client.Gauge({
   name: 'polkadot_rpc_status',
   help: 'Status of Polkadot RPC endpoint (1 = up, 0 = down)',
-  labelNames: ['endpoint', 'name']
+  labelNames: ['endpoint', 'name'],
 });
 
 registry.registerMetric(rpcBlockHeight);
@@ -46,15 +46,15 @@ registry.registerMetric(rpcStatus);
 const config = {
   prometheusUrl: process.env.PROMETHEUS_URL || 'http://prometheus:9090',
   checkInterval: parseInt(process.env.CHECK_INTERVAL, 10) || 10000,
-  port: parseInt(process.env.PORT, 10) || 3000
+  port: parseInt(process.env.PORT, 10) || 3000,
 };
 
 // Create and configure RPC monitor
 const monitor = new PolkadotRpcMonitor();
 
-monitor.setUpdateCallback(results => {
+monitor.setUpdateCallback((results) => {
   // Update Prometheus metrics
-  results.forEach(result => {
+  results.forEach((result) => {
     const { endpoint, status, responseTime, blockHeight } = result;
     const labels = { endpoint: endpoint.url, name: endpoint.name };
 
@@ -101,7 +101,7 @@ app.get('/api/history', async (req, res) => {
 
     const query = `${metric}{endpoint="${endpoint}"}[${timeRange}]`;
     const response = await axios.get(`${config.prometheusUrl}/api/v1/query`, {
-      params: { query }
+      params: { query },
     });
 
     res.json(response.data);

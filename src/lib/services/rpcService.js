@@ -145,7 +145,10 @@ class RpcService {
 
         if (latencyData.data?.result && statusData.data?.result) {
           // Process and merge both datasets
-          const historyData = processHistoricalData(latencyData.data.result, statusData.data.result);
+          const historyData = processHistoricalData(
+            latencyData.data.result,
+            statusData.data.result
+          );
           rpcStore.setHistoryData(historyData);
         }
       } catch (error) {
@@ -158,8 +161,8 @@ class RpcService {
         // Filter data based on time range
         const now = new Date();
         const rangeInMs = parseTimeRange(range);
-        const historyData = state.localHistoryData[method][endpoint].filter(d =>
-          (now - d.time) <= rangeInMs
+        const historyData = state.localHistoryData[method][endpoint].filter(
+          (d) => now - d.time <= rangeInMs
         );
         rpcStore.setHistoryData(historyData);
       } else {
@@ -186,30 +189,33 @@ class RpcService {
     }
 
     // Calculate for all endpoints with history data for current method
-    Object.keys(state.localHistoryData[state.selectedMethod]).forEach(endpoint => {
+    Object.keys(state.localHistoryData[state.selectedMethod]).forEach((endpoint) => {
       if (Array.isArray(state.localHistoryData[state.selectedMethod][endpoint])) {
         // Get recent data within time window
-        const recentData = state.localHistoryData[state.selectedMethod][endpoint].filter(item =>
-          (now - item.time.getTime()) <= timeWindow
+        const recentData = state.localHistoryData[state.selectedMethod][endpoint].filter(
+          (item) => now - item.time.getTime() <= timeWindow
         );
 
         if (recentData.length > 0) {
           // Calculate uptime (percentage of non-error responses)
-          const upCount = recentData.filter(item => !item.error).length;
-          const uptime = upCount / recentData.length * 100;
+          const upCount = recentData.filter((item) => !item.error).length;
+          const uptime = (upCount / recentData.length) * 100;
 
           // Calculate average latency (for successful responses only)
-          const successLatencies = recentData.filter(item => !item.error).map(item => item.value);
-          const avgLatency = successLatencies.length > 0
-            ? successLatencies.reduce((sum, val) => sum + val, 0) / successLatencies.length
-            : null;
+          const successLatencies = recentData
+            .filter((item) => !item.error)
+            .map((item) => item.value);
+          const avgLatency =
+            successLatencies.length > 0
+              ? successLatencies.reduce((sum, val) => sum + val, 0) / successLatencies.length
+              : null;
 
           endpointMetrics[endpoint] = {
             avgLatency: avgLatency !== null ? avgLatency : Infinity,
             uptime: uptime,
             dataPoints: recentData.length,
             remote: false, // Flag as local source
-            errorCount: recentData.filter(item => item.error).length // Track error count
+            errorCount: recentData.filter((item) => item.error).length, // Track error count
           };
         }
       }
@@ -230,7 +236,7 @@ class RpcService {
     const mbh = get(maxBlockHeight);
 
     // Update history for each endpoint
-    newResults.forEach(result => {
+    newResults.forEach((result) => {
       const url = result.endpoint.url;
       const status = categorizeStatus(result, mbh);
 
@@ -241,7 +247,7 @@ class RpcService {
       rpcStore.updateLocalHistory(method, url, {
         time: new Date(),
         value: result.responseTime,
-        error: result.status !== 'success' || result.timeout
+        error: result.status !== 'success' || result.timeout,
       });
 
       // Update error history if there's an error
@@ -251,7 +257,7 @@ class RpcService {
           errorType: result.timeout ? 'timeout' : 'error',
           message: result.error || 'Unknown error',
           details: result.details,
-          responseTime: result.responseTime
+          responseTime: result.responseTime,
         });
       }
     });
@@ -378,18 +384,18 @@ class RpcService {
         }
 
         // Convert string dates back to Date objects for all methods
-        Object.keys(parsedData).forEach(method => {
-          Object.keys(parsedData[method]).forEach(endpoint => {
+        Object.keys(parsedData).forEach((method) => {
+          Object.keys(parsedData[method]).forEach((endpoint) => {
             if (Array.isArray(parsedData[method][endpoint])) {
-              parsedData[method][endpoint] = parsedData[method][endpoint].map(item => ({
+              parsedData[method][endpoint] = parsedData[method][endpoint].map((item) => ({
                 ...item,
-                time: new Date(item.time)
+                time: new Date(item.time),
               }));
 
               // Filter out data older than MAX_STORAGE_AGE_MS
               const cutoffTime = new Date().getTime() - MAX_STORAGE_AGE_MS;
-              parsedData[method][endpoint] = parsedData[method][endpoint].filter(item =>
-                item.time.getTime() >= cutoffTime
+              parsedData[method][endpoint] = parsedData[method][endpoint].filter(
+                (item) => item.time.getTime() >= cutoffTime
               );
             }
           });
@@ -428,18 +434,18 @@ class RpcService {
         }
 
         // Convert string dates back to Date objects for all methods
-        Object.keys(parsedErrors).forEach(method => {
-          Object.keys(parsedErrors[method]).forEach(endpoint => {
+        Object.keys(parsedErrors).forEach((method) => {
+          Object.keys(parsedErrors[method]).forEach((endpoint) => {
             if (Array.isArray(parsedErrors[method][endpoint])) {
-              parsedErrors[method][endpoint] = parsedErrors[method][endpoint].map(item => ({
+              parsedErrors[method][endpoint] = parsedErrors[method][endpoint].map((item) => ({
                 ...item,
-                timestamp: new Date(item.timestamp)
+                timestamp: new Date(item.timestamp),
               }));
 
               // Filter out errors older than MAX_STORAGE_AGE_MS
               const cutoffTime = new Date().getTime() - MAX_STORAGE_AGE_MS;
-              parsedErrors[method][endpoint] = parsedErrors[method][endpoint].filter(item =>
-                item.timestamp.getTime() >= cutoffTime
+              parsedErrors[method][endpoint] = parsedErrors[method][endpoint].filter(
+                (item) => item.timestamp.getTime() >= cutoffTime
               );
             }
           });
@@ -478,7 +484,10 @@ class RpcService {
     try {
       const state = get(rpcStore);
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.localHistoryData));
-      localStorage.setItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY, JSON.stringify(state.endpointHistory));
+      localStorage.setItem(
+        LOCAL_STORAGE_ENDPOINT_HISTORY_KEY,
+        JSON.stringify(state.endpointHistory)
+      );
       localStorage.setItem(LOCAL_STORAGE_ENDPOINT_ERRORS_KEY, JSON.stringify(state.endpointErrors));
     } catch (error) {
       console.error('Error saving to localStorage:', error);
@@ -491,8 +500,14 @@ class RpcService {
         try {
           const state = get(rpcStore);
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.localHistoryData));
-          localStorage.setItem(LOCAL_STORAGE_ENDPOINT_HISTORY_KEY, JSON.stringify(state.endpointHistory));
-          localStorage.setItem(LOCAL_STORAGE_ENDPOINT_ERRORS_KEY, JSON.stringify(state.endpointErrors));
+          localStorage.setItem(
+            LOCAL_STORAGE_ENDPOINT_HISTORY_KEY,
+            JSON.stringify(state.endpointHistory)
+          );
+          localStorage.setItem(
+            LOCAL_STORAGE_ENDPOINT_ERRORS_KEY,
+            JSON.stringify(state.endpointErrors)
+          );
         } catch (retryError) {
           console.error('Still unable to save after pruning:', retryError);
         }
@@ -515,22 +530,22 @@ class RpcService {
     const updatedErrors = { ...state.endpointErrors };
 
     // Prune history data
-    Object.keys(updatedHistory).forEach(method => {
-      Object.keys(updatedHistory[method]).forEach(endpoint => {
+    Object.keys(updatedHistory).forEach((method) => {
+      Object.keys(updatedHistory[method]).forEach((endpoint) => {
         if (Array.isArray(updatedHistory[method][endpoint])) {
-          updatedHistory[method][endpoint] = updatedHistory[method][endpoint].filter(item =>
-            item.time.getTime() >= cutoffTime
+          updatedHistory[method][endpoint] = updatedHistory[method][endpoint].filter(
+            (item) => item.time.getTime() >= cutoffTime
           );
         }
       });
     });
 
     // Prune error data
-    Object.keys(updatedErrors).forEach(method => {
-      Object.keys(updatedErrors[method]).forEach(endpoint => {
+    Object.keys(updatedErrors).forEach((method) => {
+      Object.keys(updatedErrors[method]).forEach((endpoint) => {
         if (Array.isArray(updatedErrors[method][endpoint])) {
-          updatedErrors[method][endpoint] = updatedErrors[method][endpoint].filter(item =>
-            item.timestamp.getTime() >= cutoffTime
+          updatedErrors[method][endpoint] = updatedErrors[method][endpoint].filter(
+            (item) => item.timestamp.getTime() >= cutoffTime
           );
         }
       });
@@ -556,7 +571,7 @@ class RpcService {
       version: '1.0',
       historyData: state.localHistoryData,
       endpointHistory: state.endpointHistory,
-      endpointErrors: state.endpointErrors
+      endpointErrors: state.endpointErrors,
     };
 
     // Convert to JSON string
@@ -568,7 +583,7 @@ class RpcService {
 
     // Create temporary link and trigger download
     const a = document.createElement('a');
-    const fileName = `rpc-monitor-data-${new Date().toISOString().slice(0,10)}.json`;
+    const fileName = `rpc-monitor-data-${new Date().toISOString().slice(0, 10)}.json`;
     a.href = url;
     a.download = fileName;
     document.body.appendChild(a);
@@ -607,14 +622,16 @@ class RpcService {
         }
 
         // Process imported history data to restore Date objects
-        Object.keys(importedData.historyData).forEach(method => {
+        Object.keys(importedData.historyData).forEach((method) => {
           if (!importedData.historyData[method]) return;
 
-          Object.keys(importedData.historyData[method]).forEach(endpoint => {
+          Object.keys(importedData.historyData[method]).forEach((endpoint) => {
             if (Array.isArray(importedData.historyData[method][endpoint])) {
-              importedData.historyData[method][endpoint] = importedData.historyData[method][endpoint].map(item => ({
+              importedData.historyData[method][endpoint] = importedData.historyData[method][
+                endpoint
+              ].map((item) => ({
                 ...item,
-                time: new Date(item.time)
+                time: new Date(item.time),
               }));
             }
           });
@@ -622,14 +639,16 @@ class RpcService {
 
         // Process imported error data if it exists
         if (importedData.endpointErrors) {
-          Object.keys(importedData.endpointErrors).forEach(method => {
+          Object.keys(importedData.endpointErrors).forEach((method) => {
             if (!importedData.endpointErrors[method]) return;
 
-            Object.keys(importedData.endpointErrors[method]).forEach(endpoint => {
+            Object.keys(importedData.endpointErrors[method]).forEach((endpoint) => {
               if (Array.isArray(importedData.endpointErrors[method][endpoint])) {
-                importedData.endpointErrors[method][endpoint] = importedData.endpointErrors[method][endpoint].map(item => ({
+                importedData.endpointErrors[method][endpoint] = importedData.endpointErrors[method][
+                  endpoint
+                ].map((item) => ({
                   ...item,
-                  timestamp: new Date(item.timestamp)
+                  timestamp: new Date(item.timestamp),
                 }));
               }
             });
@@ -640,9 +659,18 @@ class RpcService {
         const state = get(rpcStore);
 
         // Merge with existing data
-        const mergedHistory = { ...state.localHistoryData, ...importedData.historyData };
-        const mergedEndpointHistory = { ...state.endpointHistory, ...importedData.endpointHistory };
-        const mergedErrors = { ...state.endpointErrors, ...(importedData.endpointErrors || {}) };
+        const mergedHistory = {
+          ...state.localHistoryData,
+          ...importedData.historyData,
+        };
+        const mergedEndpointHistory = {
+          ...state.endpointHistory,
+          ...importedData.endpointHistory,
+        };
+        const mergedErrors = {
+          ...state.endpointErrors,
+          ...(importedData.endpointErrors || {}),
+        };
 
         // Update stores with merged data
         rpcStore.setLocalHistoryData(mergedHistory);
@@ -661,10 +689,10 @@ class RpcService {
           this.fetchHistoricalData(currentState.selectedEndpoint, currentState.timeRange);
         }
 
-        alert("Data imported successfully");
+        alert('Data imported successfully');
       } catch (error) {
         console.error('Error importing data:', error);
-        alert("Error importing data: " + error.message);
+        alert('Error importing data: ' + error.message);
       }
     };
 

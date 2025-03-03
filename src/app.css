@@ -3,64 +3,82 @@
 
 /* Custom styles for the app */
 :root {
-    --success-color: #00FF00;
-    --warning-color: #FFaa00;
-    --error-color: #FF0000;
-    --timeout-color: #FF0000;
+  --success-color: #00ff00;
+  --warning-color: #ffaa00;
+  --error-color: #ff0000;
+  --timeout-color: #ff0000;
 }
 
 body {
-    margin: 0;
-    padding: 0;
-    background-color: var(--tui-bg) !important;
-    color: var(--tui-text) !important;
-    font-family: 'Perfect DOS VGA', monospace;
+  margin: 0;
+  padding: 0;
+  background-color: var(--tui-bg) !important;
+  color: var(--tui-text) !important;
+  font-family: 'Perfect DOS VGA', monospace;
 }
 
 /* High contrast panel headers */
 .tui-panel-header.tui-bg-blue {
-    background-color: #0000aa !important;
+  background-color: #0000aa !important;
 }
 
 .tui-window-header.tui-bg-blue {
-    background-color: #0000aa !important;
+  background-color: #0000aa !important;
 }
 
 .tui-fg-white {
-    color: #ffffff !important;
+  color: #ffffff !important;
 }
 
 /* Status indicators */
 .status-indicator {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    margin-right: 2px;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 2px;
 }
 
-.success { }
-.warning { color: var(--warning-color); }
-.error { color: var(--error-color); }
-.timeout { color: var(--timeout-color); }
+.success {
+}
+.warning {
+  color: var(--warning-color);
+}
+.error {
+  color: var(--error-color);
+}
+.timeout {
+  color: var(--timeout-color);
+}
 
-.status-icon.success { background-color: var(--success-color); }
-.status-icon.warning { background-color: var(--warning-color); }
-.status-icon.error { background-color: var(--error-color); }
-.status-icon.timeout { background-color: var(--timeout-color); }
-.status-icon.unknown { background-color: grey; }
+.status-icon.success {
+  background-color: var(--success-color);
+}
+.status-icon.warning {
+  background-color: var(--warning-color);
+}
+.status-icon.error {
+  background-color: var(--error-color);
+}
+.status-icon.timeout {
+  background-color: var(--timeout-color);
+}
+.status-icon.unknown {
+  background-color: grey;
+}
 
 /* Fix menu item hover */
 .tui-menu-item:hover {
-    background-color: var(--tui-bg-highlighted);
+  background-color: var(--tui-bg-highlighted);
 }
 
 /* Responsive layout helpers */
 @media (max-width: 1000px) {
-    .content-container {
-        flex-direction: column;
-    }
+  .content-container {
+    flex-direction: column;
+  }
 
-    .chart-panel, .rpc-panel {
-        width: 100% !important;
-    }
+  .chart-panel,
+  .rpc-panel {
+    width: 100% !important;
+  }
 }

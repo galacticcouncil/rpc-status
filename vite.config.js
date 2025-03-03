@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     fs: {
       // Allow serving files from the project root
-      allow: ['..']
-    }
-  }
+      allow: ['..'],
+    },
+  },
 });
