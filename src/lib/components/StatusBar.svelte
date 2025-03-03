@@ -32,6 +32,7 @@
   // Countdown logic
   let countdown = 0;
   let remainingMs = 0;
+  let measured = 0;
   let countdownInterval;
 
   function updateCountdown() {
@@ -43,7 +44,8 @@
 
     // Calculate elapsed time and countdown with 0.1 second precision
     const elapsedMs = now - lastRefresh;
-    remainingMs = Math.max(0, (frequency * 1000) - elapsedMs);
+    measured = (frequency * 1000) - elapsedMs
+    remainingMs = Math.max(0, measured);
     countdown = (remainingMs / 1000).toFixed(1); // Format with one decimal place
   }
 
@@ -73,17 +75,25 @@
     <li on:click={toggleRange}>
       <span>{$rpcStore.timeRange}</span>
     </li>
-    <span class="tui-statusbar-divider"></span>
-    <li>
+    <span class="tui-statusbar-divider hide-small"></span>
+    <li class="hide-small">
       <span>{$rpcStore.selectedMethod}</span>
     </li>
     <span class="tui-statusbar-divider"></span>
     <li>
       {#if remainingMs === 0}
-        <span>Checking...</span>
+        <span><span class="hide-small">Loading </span>{-measured}</span>
       {:else}
-        <span>Check in {countdown}s</span>
+        <span><span class="hide-small">Waiting </span>{countdown}s</span>
       {/if}
     </li>
   </ul>
 </div>
+
+<style>
+  @media (max-width: 600px) {
+    .hide-small {
+      display: none;
+    }
+  }
+</style>
