@@ -85,7 +85,7 @@
     }
 
     /* Hide URL column and metrics columns on narrow screens */
-    @media (max-width: 950px) {
+    @media (max-width: 1000px) {
         .url-column {
             display: none;
         }
