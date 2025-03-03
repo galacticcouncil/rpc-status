@@ -4,7 +4,6 @@ import { rpcStore, maxBlockHeight } from '../stores/rpcStore';
 import { parseTimeRange, categorizeStatus, processHistoricalData } from '../utils/helpers';
 
 // Constants
-const CHECK_INTERVAL = 5000;
 const LOCAL_STORAGE_KEY = 'hydration-rpc-monitor-data-by-method';
 const LOCAL_STORAGE_ENDPOINT_HISTORY_KEY = 'hydration-rpc-endpoint-history-by-method';
 const LOCAL_STORAGE_ENDPOINT_ERRORS_KEY = 'hydration-rpc-endpoint-errors-by-method';
@@ -41,7 +40,8 @@ class RpcService {
         this.fetchResultsFromBackend();
         this.startBackendPolling();
       } else {
-        this.monitor.start(CHECK_INTERVAL, state.selectedMethod);
+        // Use the configured refresh frequency
+        this.monitor.start(state.refreshFrequency * 1000, state.selectedMethod);
       }
 
       // Start time updates
@@ -76,6 +76,7 @@ class RpcService {
    */
   handleResultsUpdate(results) {
     rpcStore.setResults(results);
+    rpcStore.updateLastRefreshTime(); // Update last refresh time
     this.updateEndpointHistory(results);
 
     // Update metrics
@@ -99,7 +100,10 @@ class RpcService {
       clearInterval(this.intervalId);
     }
 
-    this.intervalId = setInterval(() => this.fetchResultsFromBackend(), CHECK_INTERVAL);
+    // Always use 5 seconds for backend polling
+    const BACKEND_POLL_INTERVAL = 5000;
+
+    this.intervalId = setInterval(() => this.fetchResultsFromBackend(), BACKEND_POLL_INTERVAL);
   }
 
   /**
@@ -113,6 +117,7 @@ class RpcService {
       const data = await response.json();
 
       rpcStore.setResults(data);
+      rpcStore.updateLastRefreshTime(); // Update last refresh time
       this.updateEndpointHistory(data);
       this.calculateEndpointMetrics();
       rpcStore.updateTime();
@@ -331,7 +336,8 @@ class RpcService {
         this.intervalId = null;
       }
 
-      this.monitor.start(CHECK_INTERVAL, state.selectedMethod);
+      const currentState = get(rpcStore);
+      this.monitor.start(currentState.refreshFrequency * 1000, state.selectedMethod);
 
       // When switching to local, recalculate metrics from local data
       this.calculateEndpointMetrics();
@@ -340,6 +346,24 @@ class RpcService {
     // Refresh chart data if chart is visible
     if (state.showChart && state.selectedEndpoint) {
       this.fetchHistoricalData(state.selectedEndpoint, state.timeRange);
+    }
+  }
+
+  /**
+   * Update the refresh interval
+   */
+  updateRefreshInterval() {
+    if (!browser || !this.monitor) return;
+
+    const state = get(rpcStore);
+
+    // Only update if we're using the local data source
+    if (!state.useBackend) {
+      // Stop current interval
+      this.monitor.stop();
+
+      // Restart with new frequency
+      this.monitor.start(state.refreshFrequency * 1000, state.selectedMethod);
     }
   }
 
@@ -629,7 +653,7 @@ class RpcService {
             if (Array.isArray(importedData.historyData[method][endpoint])) {
               importedData.historyData[method][endpoint] = importedData.historyData[method][
                 endpoint
-              ].map((item) => ({
+                ].map((item) => ({
                 ...item,
                 time: new Date(item.time),
               }));
@@ -646,7 +670,7 @@ class RpcService {
               if (Array.isArray(importedData.endpointErrors[method][endpoint])) {
                 importedData.endpointErrors[method][endpoint] = importedData.endpointErrors[method][
                   endpoint
-                ].map((item) => ({
+                  ].map((item) => ({
                   ...item,
                   timestamp: new Date(item.timestamp),
                 }));

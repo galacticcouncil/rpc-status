@@ -1,3 +1,5 @@
+// src/lib/stores/rpcStore.js
+
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 import { parseTimeRange } from '../utils/helpers';
@@ -18,6 +20,8 @@ const initialState = {
   showErrors: false,
   currentTime: new Date(),
   endpointMetrics: {},
+  refreshFrequency: 5, // Default 5 seconds
+  lastRefreshTime: new Date(),
 };
 
 // Create the store
@@ -113,6 +117,7 @@ function createRpcStore() {
         };
       }),
     updateTime: () => update((state) => ({ ...state, currentTime: new Date() })),
+    updateLastRefreshTime: () => update((state) => ({ ...state, lastRefreshTime: new Date() })),
     updateEndpointMetrics: (metrics) => update((state) => ({ ...state, endpointMetrics: metrics })),
     toggleErrors: () => update((state) => ({ ...state, showErrors: !state.showErrors })),
     closeChart: () => update((state) => ({ ...state, showChart: false })),
@@ -124,6 +129,7 @@ function createRpcStore() {
         endpointErrors: { [state.selectedMethod]: {} },
         endpointMetrics: {},
       })),
+    setRefreshFrequency: (seconds) => update((state) => ({ ...state, refreshFrequency: seconds })),
   };
 }
 
@@ -152,11 +158,11 @@ export const sortedResults = derived(rpcStore, ($store) => {
 export const maxBlockHeight = derived(rpcStore, ($store) => {
   return $store.results.length > 0
     ? Math.max(
-        ...$store.results
-          .filter((result) => result.status === 'success' && result.blockHeight !== undefined)
-          .map((result) => result.blockHeight),
-        0
-      )
+      ...$store.results
+        .filter((result) => result.status === 'success' && result.blockHeight !== undefined)
+        .map((result) => result.blockHeight),
+      0
+    )
     : 0;
 });
 

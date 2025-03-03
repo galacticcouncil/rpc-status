@@ -38,6 +38,14 @@
     rpcService.calculateEndpointMetrics();
   }
 
+  // Handle refresh frequency change
+  function handleRefreshFrequencyChange(seconds) {
+    if (!$rpcStore.useBackend) {  // Only allow changing for local data source
+      rpcStore.setRefreshFrequency(seconds);
+      rpcService.updateRefreshInterval();
+    }
+  }
+
   // Export/Import handling
   function handleExportData() {
     rpcService.exportLocalData();
@@ -83,45 +91,45 @@
         <ul>
           <li>
             <span
-              class="tui-menu-item"
-              class:tui-menu-active={$rpcStore.timeRange === '15m'}
-              on:click={() => handleTimeRangeSelect('15m')}
+                    class="tui-menu-item"
+                    class:tui-menu-active={$rpcStore.timeRange === '15m'}
+                    on:click={() => handleTimeRangeSelect('15m')}
             >
               Last 15 min
             </span>
           </li>
           <li>
             <span
-              class="tui-menu-item"
-              class:tui-menu-active={$rpcStore.timeRange === '1h'}
-              on:click={() => handleTimeRangeSelect('1h')}
+                    class="tui-menu-item"
+                    class:tui-menu-active={$rpcStore.timeRange === '1h'}
+                    on:click={() => handleTimeRangeSelect('1h')}
             >
               Last hour
             </span>
           </li>
           <li>
             <span
-              class="tui-menu-item"
-              class:tui-menu-active={$rpcStore.timeRange === '3h'}
-              on:click={() => handleTimeRangeSelect('3h')}
+                    class="tui-menu-item"
+                    class:tui-menu-active={$rpcStore.timeRange === '3h'}
+                    on:click={() => handleTimeRangeSelect('3h')}
             >
               Last 3 hours
             </span>
           </li>
           <li>
             <span
-              class="tui-menu-item"
-              class:tui-menu-active={$rpcStore.timeRange === '12h'}
-              on:click={() => handleTimeRangeSelect('12h')}
+                    class="tui-menu-item"
+                    class:tui-menu-active={$rpcStore.timeRange === '12h'}
+                    on:click={() => handleTimeRangeSelect('12h')}
             >
               Last 12 hours
             </span>
           </li>
           <li>
             <span
-              class="tui-menu-item"
-              class:tui-menu-active={$rpcStore.timeRange === '24h'}
-              on:click={() => handleTimeRangeSelect('24h')}
+                    class="tui-menu-item"
+                    class:tui-menu-active={$rpcStore.timeRange === '24h'}
+                    on:click={() => handleTimeRangeSelect('24h')}
             >
               Last 24 hours
             </span>
@@ -133,22 +141,70 @@
       <span>Check</span>
       <div class="tui-dropdown-content">
         <ul>
+          <!-- RPC Methods -->
           {#each rpcMethods as method}
             <li>
               <span
-                class="tui-menu-item"
-                class:tui-menu-active={$rpcStore.selectedMethod === method.id}
-                on:click={() => handleChangeMethod(method.id)}
+                      class="tui-menu-item"
+                      class:tui-menu-active={$rpcStore.selectedMethod === method.id}
+                      on:click={() => handleChangeMethod(method.id)}
               >
                 {method.name}
               </span>
             </li>
           {/each}
+
+          <div class="tui-black-divider"></div>
+
+          <!-- Refresh Frequencies -->
+          <li>
+            <span
+                    class="tui-menu-item"
+                    class:tui-menu-active={$rpcStore.refreshFrequency === 1 && !$rpcStore.useBackend}
+                    class:tui-menu-disabled={$rpcStore.useBackend}
+                    on:click={() => handleRefreshFrequencyChange(1)}
+            >
+              Every 1 sec
+            </span>
+          </li>
+          <li>
+            <span
+                    class="tui-menu-item"
+                    class:tui-menu-active={($rpcStore.refreshFrequency === 5 && !$rpcStore.useBackend) || $rpcStore.useBackend}
+                    on:click={() => handleRefreshFrequencyChange(5)}
+            >
+              Every 5 secs
+            </span>
+          </li>
+          <li>
+            <span
+                    class="tui-menu-item"
+                    class:tui-menu-active={$rpcStore.refreshFrequency === 10 && !$rpcStore.useBackend}
+                    class:tui-menu-disabled={$rpcStore.useBackend}
+                    on:click={() => handleRefreshFrequencyChange(10)}
+            >
+              Every 10 secs
+            </span>
+          </li>
         </ul>
       </div>
     </li>
     <span class="tui-datetime" data-format="h:m:s a"
-      >{$rpcStore.currentTime.toLocaleTimeString()}</span
+    >{$rpcStore.currentTime.toLocaleTimeString()}</span
     >
   </ul>
 </nav>
+
+<style>
+  .tui-menu-disabled {
+    color: #888;
+    cursor: not-allowed;
+  }
+
+  .tui-dropdown-header {
+    color: #888;
+    font-size: 0.9em;
+    padding: 2px 10px;
+    font-weight: bold;
+  }
+</style>
