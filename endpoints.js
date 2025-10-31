@@ -29,4 +29,6 @@ export default [
   { url: 'https://4.rpc.hydration.cloud', name: '4', location: 'CA' },
   { url: 'https://7.rpc.hydration.cloud', name: '7', location: 'CA' },
   { url: 'https://3.rpc.hydration.cloud', name: '3', location: 'UK' },
+  { url: 'https://rpc.3.hydration.cloud', name: '3d', location: 'UK' },
+  { url: 'https://hydration.rpc.stkd.io', name: 'stkd', location: 'BR' },
 ];
