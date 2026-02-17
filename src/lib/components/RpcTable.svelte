@@ -38,7 +38,13 @@
               <td>{result.endpoint.name}</td>
               <td class="loc-column">{result.endpoint.location}</td>
               <td class="url-column">{result.endpoint.url.replace('https://', '')}</td>
-              <td>{result.blockHeight || '?'}</td>
+              <td>
+                {#if $rpcStore.selectedMethod === 'system_version'}
+                  {result.version || result.nodeVersion || (result.response && result.response.result) || '?'}
+                {:else}
+                  {result.blockHeight || '?'}
+                {/if}
+              </td>
               <td>{result.responseTime.toFixed(0)} ms</td>
               {#if !$rpcStore.useBackend}
                 <td class="metrics-column">

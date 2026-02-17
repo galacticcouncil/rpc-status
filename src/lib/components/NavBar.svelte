@@ -16,6 +16,7 @@
       description: 'Get finalized head',
     },
     { id: 'system_syncState', name: 'system_syncState', description: 'Check sync state' },
+    { id: 'system_version', name: 'system_version', description: 'Show node version' },
   ];
 
   function handleChangeMethod(method) {

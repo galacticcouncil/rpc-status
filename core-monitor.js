@@ -81,6 +81,7 @@ class PolkadotRpcMonitor {
       // Handle different methods and extract block height
       let blockHeight;
       let secondCallData;
+      let version;
 
       if (method === 'chain_getFinalizedHead') {
         // Extract the block hash from the first response
@@ -141,6 +142,9 @@ class PolkadotRpcMonitor {
         blockHeight = parseInt(data.result, 16);
       } else if (method === 'system_syncState') {
         blockHeight = data.result.currentBlock;
+      } else if (method === 'system_version') {
+        version = String(data.result);
+        blockHeight = undefined;
       }
       // For chain_getBlock, parse as before
       else if (method === 'chain_getBlock') {
@@ -162,6 +166,7 @@ class PolkadotRpcMonitor {
         responseTime,
         timestamp: new Date().toISOString(),
         method: rpcMethod,
+        ...(method === 'system_version' && { version }),
         ...(method === 'system_syncState' && {
           syncStatus: data?.result,
         }),
