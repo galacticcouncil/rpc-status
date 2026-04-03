@@ -1,7 +1,9 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
+  import { page } from '$app/stores';
   import { rpcService } from '$lib/services/rpcService';
+  import { rpcStore } from '$lib/stores/rpcStore';
 
   // Import components
   import NavBar from '$lib/components/NavBar.svelte';
@@ -12,6 +14,10 @@
   // Initialize monitor on mount
   onMount(async () => {
     if (browser) {
+      // Read ?testnet param from URL
+      const testnetParam = $page.url.searchParams.has('testnet');
+      rpcStore.setShowTestnets(testnetParam);
+
       await rpcService.initMonitor();
 
       // Set up window event listener to save data before the page unloads

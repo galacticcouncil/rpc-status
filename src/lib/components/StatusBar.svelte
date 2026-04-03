@@ -68,6 +68,10 @@
 
 <div class="tui-statusbar">
   <ul>
+    <li>
+      <span>{$rpcStore.showTestnets ? 'Testnet' : 'Live'}</span>
+    </li>
+    <span class="tui-statusbar-divider"></span>
     <li on:click={toggleBackend}>
       <span>{$rpcStore.useBackend ? 'Remote' : 'Local'}</span>
     </li>

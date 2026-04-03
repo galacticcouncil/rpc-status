@@ -1,4 +1,7 @@
 <script>
+  import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { rpcService } from '../services/rpcService';
   import { rpcStore } from '../stores/rpcStore';
 
@@ -58,6 +61,21 @@
 
   function handleClearData() {
     rpcStore.clearLocalData();
+  }
+
+  function handleToggleTestnets() {
+    const newValue = !$rpcStore.showTestnets;
+    rpcStore.setShowTestnets(newValue);
+
+    if (browser) {
+      const url = new URL($page.url);
+      if (newValue) {
+        url.search = 'testnet';
+      } else {
+        url.search = '';
+      }
+      goto(url.toString(), { replaceState: true, noScroll: true, keepFocus: true });
+    }
   }
 </script>
 
@@ -157,6 +175,19 @@
 
           <div class="tui-black-divider"></div>
 
+          <!-- Network toggle -->
+          <li>
+            <span
+                    class="tui-menu-item"
+                    class:tui-menu-active={!$rpcStore.showTestnets}
+                    on:click={handleToggleTestnets}
+            >
+              {$rpcStore.showTestnets ? 'Show Live' : 'Show Testnet'}
+            </span>
+          </li>
+
+          <div class="tui-black-divider"></div>
+
           <!-- Refresh Frequencies -->
           <li>
             <span
@@ -208,4 +239,5 @@
     padding: 2px 10px;
     font-weight: bold;
   }
+
 </style>

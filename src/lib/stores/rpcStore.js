@@ -22,6 +22,7 @@ const initialState = {
   endpointMetrics: {},
   refreshFrequency: 5, // Default 5 seconds
   lastRefreshTime: new Date(),
+  showTestnets: false,
 };
 
 // Create the store
@@ -130,14 +131,21 @@ function createRpcStore() {
         endpointMetrics: {},
       })),
     setRefreshFrequency: (seconds) => update((state) => ({ ...state, refreshFrequency: seconds })),
+    setShowTestnets: (showTestnets) => update((state) => ({ ...state, showTestnets })),
   };
 }
 
 export const rpcStore = createRpcStore();
 
 // Derived stores
-export const sortedResults = derived(rpcStore, ($store) => {
-  return [...$store.results].sort((a, b) => {
+export const filteredResults = derived(rpcStore, ($store) => {
+  return $store.results.filter((r) =>
+    $store.showTestnets ? r.endpoint.testnet : !r.endpoint.testnet
+  );
+});
+
+export const sortedResults = derived([rpcStore, filteredResults], ([$store, $filtered]) => {
+  return [...$filtered].sort((a, b) => {
     const aMetrics = $store.endpointMetrics[a.endpoint.url];
     const bMetrics = $store.endpointMetrics[b.endpoint.url];
 

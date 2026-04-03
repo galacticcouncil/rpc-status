@@ -1,6 +1,6 @@
 <script>
   import { browser } from '$app/environment';
-  import { rpcStore, sortedResults } from '../stores/rpcStore';
+  import { rpcStore, sortedResults, filteredResults } from '../stores/rpcStore';
   import StatusIndicator from './StatusIndicator.svelte';
 
   // Handle endpoint selection for chart modal
@@ -33,7 +33,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each $rpcStore.useBackend ? $rpcStore.results : $sortedResults as result, index (result.endpoint.url)}
+          {#each $rpcStore.useBackend ? $filteredResults : $sortedResults as result, index (result.endpoint.url)}
             <tr on:click={() => handleEndpointSelect(result.endpoint)} style="cursor: pointer;">
               <td>{result.endpoint.name}</td>
               <td class="loc-column">{result.endpoint.location}</td>
