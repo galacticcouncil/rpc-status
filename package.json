@@ -7,7 +7,7 @@
     "dev": "NODE_ENV=development PROMETHEUS_URL=http://localhost:9090 nodemon backend/server.js",
     "build": "vite build",
     "start": "NODE_ENV=production node backend/server.js",
-    "test": "jest",
+    "test": "node --test test/*.test.js",
     "docker:build": "docker build -t galacticcouncil/rpc-status:latest .",
     "docker:run": "docker run -p 3000:3000 galacticcouncil/rpc-status:latest",
     "docker:prometheus": "./start-prometheus.sh",
@@ -40,7 +40,6 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.1.2",
-    "jest": "^29.7.0",
     "nodemon": "^3.0.2",
     "prettier": "^3.2.5",
     "prettier-plugin-svelte": "^3.2.1"

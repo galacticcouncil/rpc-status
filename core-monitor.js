@@ -1,12 +1,15 @@
 import defaultRpcEndpoints from './endpoints.js';
+import { annotateHealth, LAG_STALE } from './lag.js';
 
 class PolkadotRpcMonitor {
-  constructor(rpcEndpoints = defaultRpcEndpoints) {
+  constructor(rpcEndpoints = defaultRpcEndpoints, staleThreshold = LAG_STALE) {
     this.rpcEndpoints = rpcEndpoints;
     this.results = [];
     this.interval = null;
     this.onUpdate = null;
     this.currentMethod = 'chain_getBlock'; // Default RPC method
+    this.staleThreshold = staleThreshold;
+    this.chainHead = {};
   }
 
   addRpcEndpoint(url, name = '') {
@@ -142,6 +145,9 @@ class PolkadotRpcMonitor {
         blockHeight = parseInt(data.result, 16);
       } else if (method === 'system_syncState') {
         blockHeight = data.result.currentBlock;
+      } else if (method === 'system_health') {
+        // gateways do not expose system_syncState, but do answer system_health
+        blockHeight = undefined;
       } else if (method === 'system_version') {
         version = String(data.result);
         blockHeight = undefined;
@@ -169,6 +175,10 @@ class PolkadotRpcMonitor {
         ...(method === 'system_version' && { version }),
         ...(method === 'system_syncState' && {
           syncStatus: data?.result,
+        }),
+        // not `health` — that key carries the ok/stale/error verdict
+        ...(method === 'system_health' && {
+          nodeHealth: data?.result,
         }),
         ...(method === 'chain_getBlock' && {
           blockDetails: data?.result,
@@ -213,6 +223,10 @@ class PolkadotRpcMonitor {
     const results = await Promise.all(
       this.rpcEndpoints.map((endpoint) => this.checkBlockHeight(endpoint, 5000, rpcMethod))
     );
+
+    // Annotate lag/health before sorting — an endpoint that answered is not
+    // necessarily current, and that distinction is what callers report on.
+    this.chainHead = annotateHealth(results, this.staleThreshold);
 
     // Sort by block height (descending) and then by response time (ascending)
     results.sort((a, b) => {

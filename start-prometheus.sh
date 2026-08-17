@@ -25,7 +25,9 @@ docker run -d \
   -p 9090:9090 \
   -v "$(pwd)/prometheus.local.yml:/etc/prometheus/prometheus.yml" \
   --add-host=host.docker.internal:host-gateway \
-  prom/prometheus:latest
+  prom/prometheus:latest \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.retention.time=30d
 
 echo "Prometheus is running at http://localhost:9090"
 echo "It will scrape metrics from your local app at http://localhost:3000/metrics"

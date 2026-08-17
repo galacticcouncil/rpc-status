@@ -21,35 +21,16 @@ export function formatTimeLabel(time) {
   return time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// Categorize endpoint status
-export function categorizeStatus(result) {
-  // Import maxBlockHeight from store would create circular dependency
-  // Get max block height from all results with success status
-  const maxBlockHeight = result.blockHeight ? result.blockHeight : 0;
-  // If the endpoint timed out
-  if (result.timeout) {
-    return 'timeout';
-  }
-
-  // If the endpoint is down or has an error
-  if (result.status !== 'success') {
-    return 'error';
-  }
-
-  // If block height isn't reported but status is success
-  if (result.blockHeight === undefined) {
-    return 'success';
-  }
-
-  // Only mark as warning if maxBlockHeight is valid and this endpoint
-  // is significantly behind (more than 2 blocks)
-  if (maxBlockHeight > 0 && maxBlockHeight - result.blockHeight > 2) {
-    return 'warning';
-  }
-
-  // Default to success for any other case
-  return 'success';
-}
+// lag classification is shared with the backend, see lag.js at the repo root
+export {
+  LAG_WARN,
+  LAG_STALE,
+  blockLag,
+  categorizeStatus,
+  maxHeightsByChain,
+  networkOf,
+  chainOf,
+} from '../../../lag.js';
 
 // Process data for TUI chart display
 export function processHistoryDataForTuiChart(data) {

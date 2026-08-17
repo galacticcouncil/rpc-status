@@ -7,6 +7,7 @@
   --warning-color: #ffaa00;
   --error-color: #ff0000;
   --timeout-color: #ff0000;
+  --stale-color: #ff00ff;
 }
 
 body {
@@ -49,6 +50,9 @@ body {
 .timeout {
   color: var(--timeout-color);
 }
+.stale {
+  color: var(--stale-color);
+}
 
 .status-icon.success {
   background-color: var(--success-color);
@@ -61,6 +65,9 @@ body {
 }
 .status-icon.timeout {
   background-color: var(--timeout-color);
+}
+.status-icon.stale {
+  background-color: var(--stale-color);
 }
 .status-icon.unknown {
   background-color: grey;

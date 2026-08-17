@@ -2,7 +2,7 @@
 
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
-import { parseTimeRange } from '../utils/helpers';
+import { parseTimeRange, blockLag, maxHeightsByChain, chainOf } from '../utils/helpers';
 
 // Initial state
 const initialState = {
@@ -163,15 +163,21 @@ export const sortedResults = derived([rpcStore, filteredResults], ([$store, $fil
   });
 });
 
-export const maxBlockHeight = derived(rpcStore, ($store) => {
-  return $store.results.length > 0
-    ? Math.max(
-      ...$store.results
-        .filter((result) => result.status === 'success' && result.blockHeight !== undefined)
-        .map((result) => result.blockHeight),
-      0
-    )
-    : 0;
+// best head per chain — lark forks and paseo are separate chains, comparing
+// their heights against each other would report every one of them as stale
+export const maxBlockHeightByChain = derived(rpcStore, ($store) =>
+  maxHeightsByChain($store.results)
+);
+
+// blocks behind the head of its own chain, keyed by endpoint url
+export const blockLags = derived([rpcStore, maxBlockHeightByChain], ([$store, $heights]) => {
+  const lags = {};
+
+  $store.results.forEach((result) => {
+    lags[result.endpoint.url] = blockLag(result, $heights[chainOf(result.endpoint)]);
+  });
+
+  return lags;
 });
 
 export const currentErrors = derived(rpcStore, ($store) => {

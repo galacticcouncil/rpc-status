@@ -4,6 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handler } from '../build/handler.js';
 import { PolkadotRpcMonitor } from '../core-monitor.js';
+import { LAG_STALE } from '../lag.js';
+import { serializeStatus } from '../status-contract.js';
 import * as client from 'prom-client';
 import axios from 'axios';
 
@@ -34,39 +36,64 @@ const rpcResponseTime = new client.Gauge({
 
 const rpcStatus = new client.Gauge({
   name: 'polkadot_rpc_status',
-  help: 'Status of Polkadot RPC endpoint (1 = up, 0 = down)',
+  help: 'Status of Polkadot RPC endpoint (1 = healthy and current, 0 = down or stale)',
   labelNames: ['endpoint', 'name'],
+});
+
+const rpcBlockLag = new client.Gauge({
+  name: 'polkadot_rpc_block_lag',
+  help: 'Blocks behind the best head seen on the same network',
+  labelNames: ['endpoint', 'name'],
+});
+
+const rpcChainHead = new client.Gauge({
+  name: 'polkadot_rpc_chain_head',
+  help: 'Best block height seen across all monitored endpoints of a chain',
+  labelNames: ['chain'],
 });
 
 registry.registerMetric(rpcBlockHeight);
 registry.registerMetric(rpcResponseTime);
 registry.registerMetric(rpcStatus);
+registry.registerMetric(rpcBlockLag);
+registry.registerMetric(rpcChainHead);
 
 // Configuration
 const config = {
   prometheusUrl: process.env.PROMETHEUS_URL || 'http://prometheus:9090',
   checkInterval: parseInt(process.env.CHECK_INTERVAL, 10) || 5000,
   port: parseInt(process.env.PORT, 10) || 3000,
+  maxBlockLag: parseInt(process.env.MAX_BLOCK_LAG, 10) || LAG_STALE,
 };
 
 // Create and configure RPC monitor
-const monitor = new PolkadotRpcMonitor();
+const monitor = new PolkadotRpcMonitor(undefined, config.maxBlockLag);
 
 monitor.setUpdateCallback((results) => {
+  Object.entries(monitor.chainHead).forEach(([chain, height]) => {
+    // a chain whose endpoints all failed has no head — don't publish it as 0
+    if (height > 0) rpcChainHead.set({ chain }, height);
+  });
+
   // Update Prometheus metrics
   results.forEach((result) => {
-    const { endpoint, status, responseTime, blockHeight } = result;
+    const { endpoint, health, responseTime, blockHeight, blockLag } = result;
     const labels = { endpoint: endpoint.url, name: endpoint.name };
 
     // Update response time metric
     rpcResponseTime.set(labels, responseTime);
 
-    // Update status metric (1 = up, 0 = down)
-    rpcStatus.set(labels, status === 'success' ? 1 : 0);
+    // 1 only when the endpoint answered AND is current — a node serving
+    // week-old state is not up, no matter how fast it replies
+    rpcStatus.set(labels, health === 'ok' ? 1 : 0);
 
     // Update block height metric if available
     if (blockHeight !== undefined) {
       rpcBlockHeight.set(labels, blockHeight);
+    }
+
+    if (blockLag !== undefined) {
+      rpcBlockLag.set(labels, blockLag);
     }
   });
 });
@@ -79,9 +106,9 @@ app.get('/api', (req, res) => {
   res.json({ status: 'ok', message: 'Polkadot RPC Monitor API' });
 });
 
-// Get current RPC status
+// Get current RPC status — stable contract, see README.md
 app.get('/api/status', (req, res) => {
-  res.json(monitor.getLatestResults());
+  res.json(serializeStatus(monitor));
 });
 
 // Prometheus metrics endpoint

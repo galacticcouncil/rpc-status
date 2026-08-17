@@ -1,7 +1,16 @@
 <script>
   import { browser } from '$app/environment';
-  import { rpcStore, sortedResults, filteredResults } from '../stores/rpcStore';
+  import { rpcStore, sortedResults, filteredResults, blockLags } from '../stores/rpcStore';
+  import { LAG_WARN, LAG_STALE } from '../utils/helpers';
   import StatusIndicator from './StatusIndicator.svelte';
+
+  // colour the lag cell the same way the status history dots are coloured
+  function lagClass(lag) {
+    if (lag === undefined) return '';
+    if (lag >= LAG_STALE) return 'stale';
+    if (lag > LAG_WARN) return 'warning';
+    return 'success';
+  }
 
   // Handle endpoint selection for chart modal
   function handleEndpointSelect(endpoint) {
@@ -22,8 +31,10 @@
           <tr>
             <th>Name</th>
             <th class="loc-column">Location</th>
+            <th class="kind-column">Kind</th>
             <th class="url-column">URL</th>
             <th>Block</th>
+            <th>Lag</th>
             <th>Latency</th>
             {#if !$rpcStore.useBackend}
               <th class="metrics-column">Average</th>
@@ -37,12 +48,22 @@
             <tr on:click={() => handleEndpointSelect(result.endpoint)} style="cursor: pointer;">
               <td>{result.endpoint.name}</td>
               <td class="loc-column">{result.endpoint.location}</td>
+              <td class="kind-column">{result.endpoint.kind || 'node'}</td>
               <td class="url-column">{result.endpoint.url.replace('https://', '')}</td>
               <td>
                 {#if $rpcStore.selectedMethod === 'system_version'}
                   {result.version || result.nodeVersion || (result.response && result.response.result) || '?'}
                 {:else}
                   {result.blockHeight || '?'}
+                {/if}
+              </td>
+              <td class={lagClass($blockLags[result.endpoint.url])}>
+                {#if $blockLags[result.endpoint.url] === undefined}
+                  ?
+                {:else if $blockLags[result.endpoint.url] === 0}
+                  0
+                {:else}
+                  -{$blockLags[result.endpoint.url]}
                 {/if}
               </td>
               <td>{result.responseTime.toFixed(0)} ms</td>
@@ -98,6 +119,10 @@
     }
 
     .metrics-column {
+      display: none;
+    }
+
+    .kind-column {
       display: none;
     }
   }

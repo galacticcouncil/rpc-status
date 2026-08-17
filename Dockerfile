@@ -23,6 +23,8 @@ COPY --from=build /app/build ./build
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/core-monitor.js ./
 COPY --from=build /app/endpoints.js ./
+COPY --from=build /app/lag.js ./
+COPY --from=build /app/status-contract.js ./
 COPY --from=build /app/backend ./backend
 
 # Install production dependencies only

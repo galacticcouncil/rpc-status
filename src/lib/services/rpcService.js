@@ -1,7 +1,13 @@
 import { browser } from '$app/environment';
 import { get } from 'svelte/store';
-import { rpcStore, maxBlockHeight } from '../stores/rpcStore';
-import { parseTimeRange, categorizeStatus, processHistoricalData } from '../utils/helpers';
+import { rpcStore } from '../stores/rpcStore';
+import {
+  parseTimeRange,
+  categorizeStatus,
+  processHistoricalData,
+  maxHeightsByChain,
+  chainOf,
+} from '../utils/helpers';
 
 // Constants
 const LOCAL_STORAGE_KEY = 'hydration-rpc-monitor-data-by-method';
@@ -115,10 +121,27 @@ class RpcService {
     try {
       const response = await fetch('/api/status');
       const data = await response.json();
+      const results = (data.endpoints || []).map((e) => ({
+        endpoint: {
+          url: e.url,
+          name: e.name,
+          location: e.location,
+          kind: e.kind,
+          testnet: e.network === 'testnet',
+        },
+        status: e.status,
+        health: e.health,
+        blockHeight: e.blockHeight ?? undefined,
+        blockLag: e.blockLag ?? undefined,
+        responseTime: e.responseTime,
+        method: e.method,
+        error: e.error,
+        timestamp: e.checkedAt,
+      }));
 
-      rpcStore.setResults(data);
+      rpcStore.setResults(results);
       rpcStore.updateLastRefreshTime(); // Update last refresh time
-      this.updateEndpointHistory(data);
+      this.updateEndpointHistory(results);
       this.calculateEndpointMetrics();
       rpcStore.updateTime();
     } catch (error) {
@@ -238,12 +261,13 @@ class RpcService {
 
     const state = get(rpcStore);
     const method = state.selectedMethod;
-    const mbh = get(maxBlockHeight);
+    // per-chain heads, so testnet forks never mark mainnet nodes stale
+    const heads = maxHeightsByChain(newResults);
 
     // Update history for each endpoint
     newResults.forEach((result) => {
       const url = result.endpoint.url;
-      const status = categorizeStatus(result, mbh);
+      const status = categorizeStatus(result, heads[chainOf(result.endpoint)]);
 
       // Update endpoint history
       rpcStore.updateEndpointHistory(method, url, status);

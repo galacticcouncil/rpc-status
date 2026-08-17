@@ -19,6 +19,11 @@
       description: 'Get finalized head',
     },
     { id: 'system_syncState', name: 'system_syncState', description: 'Check sync state' },
+    {
+      id: 'system_health',
+      name: 'system_health',
+      description: 'Peers and sync flag (works through gateways)',
+    },
     { id: 'system_version', name: 'system_version', description: 'Show node version' },
   ];
 
