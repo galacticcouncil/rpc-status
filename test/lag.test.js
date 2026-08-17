@@ -8,6 +8,7 @@ import {
   maxHeightsByChain,
   networkOf,
   chainOf,
+  isSyncing,
   LAG_STALE,
   LAG_WARN,
 } from '../lag.js';
@@ -117,6 +118,37 @@ test('annotateHealth marks lag, network and verdict per result', () => {
       ['error', undefined, 'mainnet'],
     ]
   );
+});
+
+test('a node self-reporting isSyncing is stale even at the head', () => {
+  // the reported frozen node answered everything correctly for 7 days while
+  // system_health said isSyncing the whole time
+  const results = [
+    { ...ok('tarn', undefined), method: 'system_health', nodeHealth: { isSyncing: false } },
+    { ...ok('coke', undefined), method: 'system_health', nodeHealth: { isSyncing: true } },
+  ];
+
+  annotateHealth(results);
+  assert.deepEqual(
+    results.map((r) => r.health),
+    ['ok', 'stale']
+  );
+});
+
+test('system_syncState gaps count as stale', () => {
+  const behind = {
+    ...ok('coke', 13_000_000),
+    method: 'system_syncState',
+    syncStatus: {
+      startingBlock: 1,
+      currentBlock: 13_000_000,
+      highestBlock: 13_000_000 + LAG_STALE,
+    },
+  };
+
+  assert.equal(isSyncing(behind), true);
+  annotateHealth([behind]);
+  assert.equal(behind.health, 'stale');
 });
 
 test('the stale threshold is configurable', () => {

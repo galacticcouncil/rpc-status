@@ -7,7 +7,9 @@ browser and from a server-side checker. Live at
 Every round polls each endpoint in `endpoints.js`, takes the best block height
 seen **per chain**, and grades each endpoint against it. **Responding is not the
 same as being current**: an endpoint that answers in 40ms while serving
-week-old state is reported stale, not up.
+week-old state is reported stale, not up. A node that self-reports
+`system_health.isSyncing` or a `system_syncState` gap is stale too, whatever its
+height says.
 
 Heights are only ever compared within one chain. Mainnet endpoints share the
 `hydration` chain; each testnet endpoint is its own chain unless endpoints are

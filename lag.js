@@ -53,6 +53,11 @@ export function categorizeStatus(result, maxBlockHeight = 0) {
     return 'error';
   }
 
+  // the node's own report, available from system_health / system_syncState
+  if (isSyncing(result)) {
+    return 'stale';
+  }
+
   // If block height isn't reported but status is success
   if (result.blockHeight === undefined) {
     return 'success';
@@ -74,6 +79,18 @@ export function categorizeStatus(result, maxBlockHeight = 0) {
   return 'success';
 }
 
+// the node's own staleness self-report, when the check asked for it
+export function isSyncing(result) {
+  if (result?.nodeHealth?.isSyncing === true) return true;
+
+  const sync = result?.syncStatus;
+  if (sync && sync.highestBlock !== undefined && sync.currentBlock !== undefined) {
+    return sync.highestBlock - sync.currentBlock >= LAG_STALE;
+  }
+
+  return false;
+}
+
 // annotate a round of results with lag and a health verdict, in place
 export function annotateHealth(results, staleThreshold = LAG_STALE) {
   const heights = maxHeightsByChain(results);
@@ -89,6 +106,10 @@ export function annotateHealth(results, staleThreshold = LAG_STALE) {
     if (result.status !== 'success') {
       result.health = 'error';
     } else if (lag !== undefined && lag >= staleThreshold) {
+      result.health = 'stale';
+    } else if (isSyncing(result)) {
+      // the node says so itself — a frozen node reports isSyncing for as long
+      // as it is stuck, even while answering everything else correctly
       result.health = 'stale';
     } else {
       result.health = 'ok';
