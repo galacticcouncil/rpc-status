@@ -54,6 +54,12 @@ export default [
   { url: 'https://rpc.coke.hydration.cloud', name: 'coke (node)', location: 'SG', kind: 'node' },
   { url: 'https://hdx.tarn.hydration.cloud', name: 'tarn', location: '?', kind: 'node' },
   {
+    url: 'https://hdx.shellfish.hydration.cloud',
+    name: 'shellfish (node)',
+    location: '?',
+    kind: 'node',
+  },
+  {
     url: 'https://node-dir.kril.hydration.cloud',
     name: 'kril (node)',
     location: '?',
